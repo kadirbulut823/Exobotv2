@@ -124,10 +124,17 @@ export function filtreleriCalistir(icerik, sender, config) {
   const kul = (sender.username || "").toLowerCase();
   const simdi = Date.now();
 
+  // --- Sohbetten eklenen yasakli kelimeler (!yasakekle) ---
+  // Kufur filtresi kapali olsa bile bunlar HER ZAMAN kontrol edilir.
+  for (const kelime of store.get().yasakli_ek || []) {
+    if (kelimeVarMi(temiz, kelime)) {
+      return { sebep: "Yasaklı kelime", agirlik: f.yasakli_kelimeler?.ceza_agirligi ?? 2 };
+    }
+  }
+
   // --- Kufur ---
   if (f.kufur?.aktif) {
-    const liste = [...(f.kufur.kelimeler || []), ...store.get().yasakli_ek];
-    for (const kelime of liste) {
+    for (const kelime of f.kufur.kelimeler || []) {
       if (kelimeVarMi(temiz, kelime)) {
         return { sebep: "Küfür / hakaret", agirlik: f.kufur.ceza_agirligi ?? 2 };
       }

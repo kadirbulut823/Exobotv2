@@ -1,7 +1,7 @@
 // Komutlar: genel komutlar, moderator komutlari, cekilis ve puan sistemi
 import * as kick from "./kickApi.js";
 import * as store from "./store.js";
-import { moderatorMu, cezaPuaniSifirla } from "./moderation.js";
+import { moderatorMu, cezaPuaniSifirla, cezaPuaniGetir } from "./moderation.js";
 
 // Kullanici adi -> user_id (ban/timeout komutlari icin gerekli)
 export const kullaniciCache = new Map();
@@ -77,7 +77,7 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
     const sabit = [prefix + "puan", prefix + "top"];
     let cevap = `Komutlar: ${[...sabit, ...ozel].join(" | ")}`;
     if (moderatorMu(sender, broadcaster)) {
-      cevap += ` || MOD: ${prefix}to ${prefix}ban ${prefix}unban ${prefix}af ${prefix}duyuru ${prefix}yasakekle ${prefix}yasakcikar ${prefix}yasaklilar ${prefix}cekilis`;
+      cevap += ` || MOD: ${prefix}to ${prefix}ban ${prefix}unban ${prefix}af ${prefix}ceza ${prefix}duyuru ${prefix}yasakekle ${prefix}yasakcikar ${prefix}yasaklilar ${prefix}cekilis`;
     }
     await yaz(cevap.slice(0, 490));
     return true;
@@ -157,11 +157,61 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
     return true;
   }
 
-  // !af <kullanici>  -> ceza puanlarini sifirla
-  if (komut === "af") {
+  // !af <kullanici>  -> ceza puanlarini sifirla + varsa bani/susturmayi kaldir
+  if (["af", "cezasil", "cezakaldir", "temizle"].includes(komut)) {
     const hedef = (arg[0] || "").replace("@", "").toLowerCase();
-    cezaPuaniSifirla(hedef);
-    await yaz(`@${hedef} ceza puanları sıfırlandı.`);
+    if (!hedef) {
+      await yaz(`Kullanım: ${prefix}af <kullanıcı>`);
+      return true;
+    }
+
+    const vardi = cezaPuaniSifirla(hedef);
+
+    // Susturma/ban da varsa kaldirmayi dene (yoksa sessizce gec)
+    let banNotu = "";
+    const id = kullaniciCache.get(hedef);
+    if (id) {
+      try {
+        await kick.banKaldir(broadcasterUserId, id);
+        banNotu = " Susturma/ban da kaldırıldı.";
+      } catch {
+        // kullanici zaten banli degilse hata verir, onemsiz
+      }
+    }
+
+    store.logEkle({ kullanici: hedef, sebep: "Af", islem: "af", yetkili: sender.username });
+    await yaz(
+      vardi
+        ? `✅ @${hedef} ceza puanları sıfırlandı.${banNotu}`
+        : `@${hedef} zaten temizdi (ceza puanı yoktu).${banNotu}`
+    );
+    return true;
+  }
+
+  // !ceza <kullanici>  -> mevcut ceza puanini goster
+  if (["ceza", "cezapuan", "cezapuani"].includes(komut)) {
+    const hedef = (arg[0] || "").replace("@", "").toLowerCase();
+    if (!hedef) {
+      await yaz(`Kullanım: ${prefix}ceza <kullanıcı>`);
+      return true;
+    }
+    const sifirlamaDk = config.cezalar?.puan_sifirlama_dakika ?? 60;
+    const puan = cezaPuaniGetir(hedef, sifirlamaDk);
+    const adimlar = config.cezalar?.adimlar || [];
+    const sonraki = adimlar[Math.min(puan, adimlar.length - 1)];
+    const sonrakiMetin = sonraki
+      ? sonraki.islem === "ban"
+        ? "kalıcı ban"
+        : sonraki.islem === "timeout"
+        ? `${sonraki.sure} dk susturma`
+        : "uyarı"
+      : "kalıcı ban";
+
+    await yaz(
+      puan === 0
+        ? `@${hedef} temiz — ceza puanı yok.`
+        : `@${hedef} → ceza puanı: ${puan}. Bir sonraki ihlalde: ${sonrakiMetin}. (Temiz kalırsa ${sifirlamaDk} dk sonra sıfırlanır.)`
+    );
     return true;
   }
 

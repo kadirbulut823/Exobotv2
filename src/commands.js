@@ -13,12 +13,17 @@ export function kullaniciKaydet(sender) {
 }
 
 // ---------- Cekilis ----------
-export const cekilis = {
-  aktif: false,
-  anahtar: "",
-  katilimcilar: new Map(), // username -> user_id
-  kazanan: null,
-};
+// Cekilis durumu kalici olarak db.json icinde tutulur.
+// (Bot yeniden baslasa bile cekilis kaybolmaz.)
+export function cekilisDurum() {
+  const db = store.get();
+  if (!db.cekilis) db.cekilis = { aktif: false, anahtar: "", katilimcilar: {}, kazanan: null };
+  return db.cekilis;
+}
+
+export function cekilisKatilimciSayisi() {
+  return Object.keys(cekilisDurum().katilimcilar || {}).length;
+}
 
 // ---------- Puan ----------
 const puanCooldown = new Map();
@@ -47,9 +52,12 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
   const metin = icerik.trim();
 
   // --- Cekilise katilim (komut degil, anahtar kelime) ---
-  if (cekilis.aktif && metin.toLocaleLowerCase("tr-TR") === cekilis.anahtar) {
-    if (!cekilis.katilimcilar.has(sender.username.toLowerCase())) {
-      cekilis.katilimcilar.set(sender.username.toLowerCase(), sender.user_id);
+  const ck = cekilisDurum();
+  if (ck.aktif && metin.toLocaleLowerCase("tr-TR") === ck.anahtar) {
+    const kul = sender.username.toLowerCase();
+    if (!ck.katilimcilar[kul]) {
+      ck.katilimcilar[kul] = sender.user_id;
+      store.kaydet();
     }
     return true; // mesaji filtrelerden gecirmeye gerek yok
   }
@@ -67,7 +75,11 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
   if (komut === "komutlar" || komut === "yardim") {
     const ozel = Object.keys(config.komutlar || {}).map((k) => prefix + k);
     const sabit = [prefix + "puan", prefix + "top"];
-    await yaz(`Komutlar: ${[...sabit, ...ozel].join(" | ")}`);
+    let cevap = `Komutlar: ${[...sabit, ...ozel].join(" | ")}`;
+    if (moderatorMu(sender, broadcaster)) {
+      cevap += ` || MOD: ${prefix}to ${prefix}ban ${prefix}unban ${prefix}af ${prefix}duyuru ${prefix}yasakekle ${prefix}yasakcikar ${prefix}yasaklilar ${prefix}cekilis`;
+    }
+    await yaz(cevap.slice(0, 490));
     return true;
   }
 
@@ -160,65 +172,100 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
     return true;
   }
 
-  // !yasakla <kelime> / !yasakkaldir <kelime>
-  if (komut === "yasakla") {
-    const kelime = arg.join(" ").toLowerCase();
-    if (!kelime) return true;
+  // !yasakekle <kelime> / !yasakcikar <kelime> / !yasaklilar
+  if (["yasakekle", "yasakla", "yasak", "kelimeekle"].includes(komut)) {
+    const kelime = arg.join(" ").toLocaleLowerCase("tr-TR").trim();
+    if (!kelime) {
+      await yaz(`Kullanım: ${prefix}yasakekle <kelime>`);
+      return true;
+    }
     const db = store.get();
-    if (!db.yasakli_ek.includes(kelime)) db.yasakli_ek.push(kelime);
+    if (db.yasakli_ek.includes(kelime)) {
+      await yaz(`"${kelime}" zaten yasaklı listesinde.`);
+      return true;
+    }
+    db.yasakli_ek.push(kelime);
     store.kaydet();
-    await yaz(`"${kelime}" yasaklı kelimelere eklendi.`);
+    store.logEkle({ kullanici: "-", sebep: `Yasaklı kelime eklendi: ${kelime}`, islem: "yasakekle", yetkili: sender.username });
+    await yaz(`✅ "${kelime}" yasaklı kelimelere eklendi. (Toplam: ${db.yasakli_ek.length})`);
     return true;
   }
 
-  if (komut === "yasakkaldir") {
-    const kelime = arg.join(" ").toLowerCase();
+  if (["yasakcikar", "yasakkaldir", "kelimecikar"].includes(komut)) {
+    const kelime = arg.join(" ").toLocaleLowerCase("tr-TR").trim();
+    if (!kelime) {
+      await yaz(`Kullanım: ${prefix}yasakcikar <kelime>`);
+      return true;
+    }
     const db = store.get();
+    if (!db.yasakli_ek.includes(kelime)) {
+      await yaz(`"${kelime}" listede yok. (Not: config.json'daki sabit kelimeler bu komutla silinemez.)`);
+      return true;
+    }
     db.yasakli_ek = db.yasakli_ek.filter((k) => k !== kelime);
     store.kaydet();
-    await yaz(`"${kelime}" yasaklı kelimelerden çıkarıldı.`);
+    store.logEkle({ kullanici: "-", sebep: `Yasaklı kelime çıkarıldı: ${kelime}`, islem: "yasakcikar", yetkili: sender.username });
+    await yaz(`✅ "${kelime}" yasaklı kelimelerden çıkarıldı.`);
+    return true;
+  }
+
+  if (["yasaklilar", "yasakliste", "yasaklar"].includes(komut)) {
+    const liste = store.get().yasakli_ek;
+    await yaz(
+      liste.length
+        ? `Sohbetten eklenen yasaklı kelimeler (${liste.length}): ${liste.join(", ")}`.slice(0, 490)
+        : "Sohbetten eklenmiş yasaklı kelime yok."
+    );
     return true;
   }
 
   // !cekilis basla <anahtar> | cek | iptal | durum
-  if (komut === "cekilis" || komut === "çekiliş") {
+  if (["cekilis", "çekiliş", "cekilis", "çekilis", "cekiliş"].includes(komut)) {
     if (!config.cekilis?.aktif) return true;
+    const c = cekilisDurum();
     const alt = (arg[0] || "durum").toLocaleLowerCase("tr-TR");
 
-    if (alt === "basla" || alt === "başla") {
+    if (["basla", "başla", "baslat", "başlat", "ac", "aç"].includes(alt)) {
       const anahtar = (arg[1] || "!katil").toLocaleLowerCase("tr-TR");
-      cekilis.aktif = true;
-      cekilis.anahtar = anahtar;
-      cekilis.katilimcilar = new Map();
-      cekilis.kazanan = null;
+      c.aktif = true;
+      c.anahtar = anahtar;
+      c.katilimcilar = {};
+      c.kazanan = null;
+      store.kaydet();
       await yaz(`🎉 ÇEKİLİŞ BAŞLADI! Katılmak için sohbete "${anahtar}" yaz.`);
       return true;
     }
 
-    if (alt === "cek" || alt === "çek") {
-      if (!cekilis.aktif || cekilis.katilimcilar.size === 0) {
-        await yaz("Aktif çekiliş yok veya hiç katılımcı yok.");
+    if (["cek", "çek", "bitir", "sonuc", "sonuç", "kazanan"].includes(alt)) {
+      const isimler = Object.keys(c.katilimcilar || {});
+      if (isimler.length === 0) {
+        await yaz(
+          c.aktif
+            ? `Henüz kimse katılmadı. Katılmak için: "${c.anahtar}"`
+            : "Aktif çekiliş yok. Başlatmak için: !cekilis basla <kelime>"
+        );
         return true;
       }
-      const isimler = [...cekilis.katilimcilar.keys()];
       const kazanan = isimler[Math.floor(Math.random() * isimler.length)];
-      cekilis.kazanan = kazanan;
-      cekilis.aktif = false;
+      c.kazanan = kazanan;
+      c.aktif = false;
+      store.kaydet();
       await yaz(`🏆 KAZANAN: @${kazanan}! (${isimler.length} katılımcı arasından) Tebrikler!`);
       return true;
     }
 
-    if (alt === "iptal") {
-      cekilis.aktif = false;
-      cekilis.katilimcilar = new Map();
+    if (["iptal", "kapat", "sil"].includes(alt)) {
+      c.aktif = false;
+      c.katilimcilar = {};
+      store.kaydet();
       await yaz("Çekiliş iptal edildi.");
       return true;
     }
 
     await yaz(
-      cekilis.aktif
-        ? `Çekiliş aktif. Katılmak için: "${cekilis.anahtar}" — Katılımcı: ${cekilis.katilimcilar.size}`
-        : "Şu an aktif çekiliş yok."
+      c.aktif
+        ? `Çekiliş aktif. Katılmak için: "${c.anahtar}" — Katılımcı: ${cekilisKatilimciSayisi()}`
+        : "Şu an aktif çekiliş yok. Başlatmak için: !cekilis basla <kelime>"
     );
     return true;
   }

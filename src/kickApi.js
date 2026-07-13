@@ -149,11 +149,29 @@ export async function benKimim() {
   return j?.data?.[0] || null; // { user_id, name, ... }
 }
 
-export async function mesajGonder(broadcasterUserId, icerik, tip = "bot", replyToMessageId = null) {
-  const body = { type: tip, content: String(icerik).slice(0, 500) };
-  if (tip === "user" || broadcasterUserId) body.broadcaster_user_id = broadcasterUserId;
-  if (replyToMessageId) body.reply_to_message_id = replyToMessageId;
-  return api("POST", "/public/v1/chat", { body });
+export async function mesajGonder(broadcasterUserId, icerik, tip = "user", replyToMessageId = null) {
+  // Kick sadece "user" veya "bot" kabul eder. Baska bir sey yazilmissa "user"a cevir.
+  let mesajTipi = tip === "bot" ? "bot" : "user";
+
+  const govdeOlustur = (t) => {
+    const body = { type: t, content: String(icerik).slice(0, 500) };
+    // ONEMLI: "bot" tipinde broadcaster_user_id GONDERILMEZ.
+    // "user" tipinde ZORUNLUDUR.
+    if (t === "user") body.broadcaster_user_id = broadcasterUserId;
+    if (replyToMessageId) body.reply_to_message_id = replyToMessageId;
+    return body;
+  };
+
+  try {
+    return await api("POST", "/public/v1/chat", { body: govdeOlustur(mesajTipi) });
+  } catch (e) {
+    // "bot" tipi Kick tarafinda sik sik hata veriyor -> "user" ile tekrar dene
+    if (mesajTipi === "bot") {
+      console.warn("[kick] 'bot' tipi basarisiz, 'user' tipiyle tekrar deneniyor...");
+      return api("POST", "/public/v1/chat", { body: govdeOlustur("user") });
+    }
+    throw e;
+  }
 }
 
 export async function mesajSil(messageId) {

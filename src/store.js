@@ -12,6 +12,7 @@ const varsayilan = {
   puanlar: {}, // { "username": 120 }
   ban_gecmisi: [], // moderasyon logu
   yasakli_ek: [], // sohbetten eklenen yasakli kelimeler
+  cekilis: { aktif: false, anahtar: "", katilimcilar: {}, kazanan: null },
 };
 
 let db = { ...varsayilan };

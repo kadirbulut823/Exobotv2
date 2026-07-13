@@ -2,9 +2,15 @@
 import * as kick from "./kickApi.js";
 import * as store from "./store.js";
 
-// Kullanici basina gecici hafiza (sunucu yeniden baslayinca sifirlanir)
-const cezaPuanlari = new Map(); // username -> { puan, sonIhlal }
+// Ceza puanlari db.json icinde KALICI olarak tutulur (bot yeniden baslasa da silinmez).
+// Mesaj gecmisi (flood tespiti) ise gecicidir, kalici olmasina gerek yok.
 const mesajGecmisi = new Map(); // username -> [{ zaman, metin }]
+
+function cezaKayitlari() {
+  const db = store.get();
+  if (!db.cezalar) db.cezalar = {};
+  return db.cezalar;
+}
 
 // ---------- Yardimcilar ----------
 
@@ -225,19 +231,36 @@ export function filtreleriCalistir(icerik, sender, config) {
 
 function cezaPuaniEkle(kul, agirlik, sifirlamaDk) {
   const simdi = Date.now();
-  const kayit = cezaPuanlari.get(kul);
+  const kayitlar = cezaKayitlari();
+  const kayit = kayitlar[kul];
+
+  // Kullanici bu sure boyunca temiz kaldiysa puanlari sifirla
   if (kayit && simdi - kayit.sonIhlal > sifirlamaDk * 60000) {
-    cezaPuanlari.delete(kul);
+    delete kayitlar[kul];
   }
-  const yeni = cezaPuanlari.get(kul) || { puan: 0, sonIhlal: 0 };
+
+  const yeni = kayitlar[kul] || { puan: 0, sonIhlal: 0 };
   yeni.puan += agirlik;
   yeni.sonIhlal = simdi;
-  cezaPuanlari.set(kul, yeni);
+  kayitlar[kul] = yeni;
+  store.kaydet();
   return yeni.puan;
 }
 
+// Bir kullanicinin guncel ceza puanini dondurur (sure dolmussa 0)
+export function cezaPuaniGetir(kul, sifirlamaDk = 60) {
+  const kayit = cezaKayitlari()[kul.toLowerCase()];
+  if (!kayit) return 0;
+  if (Date.now() - kayit.sonIhlal > sifirlamaDk * 60000) return 0;
+  return kayit.puan;
+}
+
 export function cezaPuaniSifirla(kul) {
-  cezaPuanlari.delete(kul.toLowerCase());
+  const kayitlar = cezaKayitlari();
+  const vardi = Boolean(kayitlar[kul.toLowerCase()]);
+  delete kayitlar[kul.toLowerCase()];
+  store.kaydet();
+  return vardi;
 }
 
 export async function cezalandir({ ihlal, sender, messageId, broadcasterUserId, config }) {

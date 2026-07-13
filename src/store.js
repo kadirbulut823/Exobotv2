@@ -13,6 +13,7 @@ const varsayilan = {
   ban_gecmisi: [], // moderasyon logu
   yasakli_ek: [], // sohbetten eklenen yasakli kelimeler
   cekilis: { aktif: false, anahtar: "", katilimcilar: {}, kazanan: null },
+  cezalar: {}, // { "username": { puan: 3, sonIhlal: 1712345678901 } }
 };
 
 let db = { ...varsayilan };

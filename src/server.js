@@ -239,7 +239,7 @@ app.get("/panel", (req, res) => {
       <b>Kanal:</b> ${config.kanal.slug} &nbsp;|&nbsp;
       <b>Giriş:</b> ${kick.girisYapildiMi() ? "✅" : "❌"} &nbsp;|&nbsp;
       <b>Yayın:</b> ${yayinAcik ? "🔴 Açık" : "⚫ Kapalı"} &nbsp;|&nbsp;
-      <b>Çekiliş:</b> ${cmd.cekilis.aktif ? `açık (${cmd.cekilis.katilimcilar.size} kişi)` : "kapalı"}
+      <b>Çekiliş:</b> ${cmd.cekilisDurum().aktif ? `açık (${cmd.cekilisKatilimciSayisi()} kişi)` : "kapalı"}
     </div>
     <div class="kart">
       <h3>Son moderasyon işlemleri</h3>

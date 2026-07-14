@@ -352,7 +352,9 @@ let AYAR = null;
 async function iste(yol, secenek = {}) {
   const r = await fetch(yol, {
     ...secenek,
-    headers: { "Content-Type": "application/json", "x-panel-key": ANAHTAR, ...(secenek.headers || {}) },
+    // Not: HTTP basliklari sadece ASCII kabul eder. Sifrede Turkce karakter varsa
+    // ("şifreM1") tarayici hata verir. Bu yuzden kodlayarak gonderiyoruz.
+    headers: { "Content-Type": "application/json", "x-panel-key": encodeURIComponent(ANAHTAR), ...(secenek.headers || {}) },
   });
   const veri = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(veri.hata || "İstek başarısız (" + r.status + ")");
@@ -758,7 +760,7 @@ async function puanSifirla() {
 
 // ---------- Baslangic ----------
 if (ANAHTAR) {
-  fetch("/api/durum", { headers: { "x-panel-key": ANAHTAR } }).then((r) => {
+  fetch("/api/durum", { headers: { "x-panel-key": encodeURIComponent(ANAHTAR) } }).then((r) => {
     if (r.ok) baslat();
     else sessionStorage.removeItem("panelKey");
   });

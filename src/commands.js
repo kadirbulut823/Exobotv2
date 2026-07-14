@@ -73,7 +73,7 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
   // ================= GENEL KOMUTLAR =================
 
   if (komut === "komutlar" || komut === "yardim") {
-    const ozel = Object.keys(config.komutlar || {}).map((k) => prefix + k);
+    const ozel = Object.keys(config.komutlar || {}).filter((k) => !k.startsWith("_")).map((k) => prefix + k);
     const sabit = [prefix + "puan", prefix + "top"];
     let cevap = `Komutlar: ${[...sabit, ...ozel].join(" | ")}`;
     if (moderatorMu(sender, broadcaster)) {
@@ -101,7 +101,7 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
   }
 
   // Config'deki ozel komutlar (!discord, !sosyal ...)
-  if (config.komutlar && config.komutlar[komut]) {
+  if (config.komutlar && !komut.startsWith("_") && config.komutlar[komut]) {
     await yaz(config.komutlar[komut]);
     return true;
   }

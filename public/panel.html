@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mod Konsolu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --zemin:#0a0d0b; --panel:#11150f; --cizgi:#20261c; --cizgi2:#2c3325;
+    --metin:#e8ede4; --soluk:#8a9484; --yesil:#53fc18; --amber:#ffb020; --kirmizi:#ff4d4d; --mavi:#5ac8fa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--zemin);color:var(--metin);font-family:'Space Grotesk',system-ui,sans-serif;font-size:15px;line-height:1.5}
+  code,.mono,input,textarea,select,button{font-family:'JetBrains Mono',monospace}
+
+  /* --- Giris --- */
+  #giris{position:fixed;inset:0;background:var(--zemin);display:flex;align-items:center;justify-content:center;z-index:50}
+  #giris .kutu{width:min(380px,90vw);border:1px solid var(--cizgi2);border-radius:4px;padding:28px;background:var(--panel)}
+  #giris h1{font-size:20px;letter-spacing:-.02em;margin-bottom:6px}
+  #giris p{color:var(--soluk);font-size:13px;margin-bottom:18px}
+
+  /* --- Iskelet --- */
+  .kabuk{display:grid;grid-template-columns:190px 1fr;min-height:100vh}
+  aside{border-right:1px solid var(--cizgi);padding:20px 0;background:var(--panel);position:sticky;top:0;height:100vh;overflow:auto}
+  .marka{padding:0 20px 20px;border-bottom:1px solid var(--cizgi);margin-bottom:14px}
+  .marka b{display:block;font-size:15px;letter-spacing:-.02em}
+  .marka span{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--soluk)}
+  nav button{display:flex;justify-content:space-between;align-items:center;width:100%;background:none;border:0;color:var(--soluk);
+    padding:9px 20px;text-align:left;cursor:pointer;font-size:13px;border-left:2px solid transparent}
+  nav button:hover{color:var(--metin);background:#161b13}
+  nav button.aktif{color:var(--yesil);border-left-color:var(--yesil);background:#141a10}
+  nav .rozet{font-size:10px;color:var(--soluk);background:var(--cizgi);border-radius:2px;padding:1px 5px}
+  main{padding:26px 30px 60px;max-width:1000px}
+
+  h2{font-size:19px;letter-spacing:-.02em;margin-bottom:3px}
+  .altbaslik{color:var(--soluk);font-size:13px;margin-bottom:20px}
+  .kart{border:1px solid var(--cizgi);border-radius:4px;background:var(--panel);padding:18px;margin-bottom:16px}
+  .kart h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--soluk);margin-bottom:14px;font-weight:500}
+
+  /* --- Durum seridi --- */
+  .serit{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--cizgi);border:1px solid var(--cizgi);border-radius:4px;overflow:hidden;margin-bottom:16px}
+  .serit div{background:var(--panel);padding:14px 16px}
+  .serit .etiket{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--soluk);margin-bottom:5px}
+  .serit .deger{font-size:18px;font-weight:500;letter-spacing:-.02em}
+  .nokta{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .yesilnokta{background:var(--yesil);box-shadow:0 0 8px var(--yesil)}
+  .kirminokta{background:var(--kirmizi)}
+  .grinokta{background:var(--soluk)}
+
+  /* --- Form --- */
+  input,textarea,select{background:#0d110c;border:1px solid var(--cizgi2);color:var(--metin);padding:8px 10px;border-radius:3px;font-size:13px;width:100%}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--yesil)}
+  textarea{resize:vertical;min-height:70px;line-height:1.6}
+  label{display:block;font-size:12px;color:var(--soluk);margin-bottom:5px}
+  .satir{display:flex;gap:8px;flex-wrap:wrap}
+  .satir>*{flex:1;min-width:120px}
+  .satir button{flex:0 0 auto}
+  .alan{margin-bottom:14px}
+
+  button.btn{background:var(--yesil);color:#0a0d0b;border:0;padding:8px 16px;border-radius:3px;font-weight:700;cursor:pointer;font-size:13px;white-space:nowrap}
+  button.btn:hover{filter:brightness(1.1)}
+  button.ikincil{background:transparent;border:1px solid var(--cizgi2);color:var(--metin)}
+  button.ikincil:hover{border-color:var(--metin);filter:none}
+  button.tehlike{background:transparent;border:1px solid var(--kirmizi);color:var(--kirmizi)}
+  button.tehlike:hover{background:var(--kirmizi);color:#0a0d0b}
+  button.mini{padding:3px 8px;font-size:11px}
+
+  /* --- Anahtarlar --- */
+  .anahtar{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--cizgi)}
+  .anahtar:last-child{border-bottom:0}
+  .anahtar .ad{font-size:14px}
+  .anahtar .ipucu{font-size:11px;color:var(--soluk);margin-top:2px}
+  .kaydir{position:relative;width:38px;height:20px;flex:0 0 auto}
+  .kaydir input{opacity:0;width:0;height:0;position:absolute}
+  .kaydir span{position:absolute;inset:0;background:var(--cizgi2);border-radius:20px;cursor:pointer;transition:.15s}
+  .kaydir span:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:var(--soluk);border-radius:50%;transition:.15s}
+  .kaydir input:checked+span{background:#20340f}
+  .kaydir input:checked+span:before{transform:translateX(18px);background:var(--yesil)}
+
+  /* --- Etiket bulutu --- */
+  .bulut{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .cip{display:inline-flex;align-items:center;gap:6px;background:#0d110c;border:1px solid var(--cizgi2);border-radius:3px;
+    padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:12px}
+  .cip button{background:none;border:0;color:var(--soluk);cursor:pointer;font-size:14px;line-height:1;padding:0}
+  .cip button:hover{color:var(--kirmizi)}
+
+  /* --- Log (imza: sohbet dokumu gibi) --- */
+  .log{font-family:'JetBrains Mono',monospace;font-size:12.5px}
+  .log .satirlog{display:grid;grid-template-columns:130px 1fr auto;gap:12px;padding:7px 0;border-bottom:1px solid var(--cizgi);align-items:baseline}
+  .log .zaman{color:var(--soluk);font-size:11px}
+  .log .kul{color:var(--metin);font-weight:700}
+  .log .sebep{color:var(--soluk)}
+  .log .islem{text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .i-ban{color:var(--kirmizi)} .i-timeout{color:var(--amber)} .i-sil_uyar{color:var(--soluk)}
+  .i-af{color:var(--yesil)} .i-yasakekle,.i-yasakcikar{color:var(--mavi)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;
+     color:var(--soluk);font-weight:500;padding:0 0 8px;border-bottom:1px solid var(--cizgi)}
+  td{padding:9px 0;border-bottom:1px solid var(--cizgi)}
+  td.mono{font-family:'JetBrains Mono',monospace}
+  tr:last-child td{border-bottom:0}
+
+  .bos{color:var(--soluk);font-size:13px;padding:22px 0;text-align:center}
+  .gizli{display:none!important}
+  .uyari{background:#1a1408;border:1px solid #3d2f10;color:var(--amber);padding:10px 12px;border-radius:3px;font-size:12.5px;margin-bottom:14px}
+
+  #tost{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--yesil);color:var(--metin);
+    padding:11px 16px;border-radius:3px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:60;max-width:340px}
+  #tost.gor{opacity:1;transform:none}
+  #tost.hata{border-color:var(--kirmizi)}
+
+  @media(max-width:760px){
+    .kabuk{grid-template-columns:1fr}
+    aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--cizgi)}
+    nav{display:flex;overflow-x:auto}
+    nav button{border-left:0;border-bottom:2px solid transparent;white-space:nowrap;padding:10px 14px}
+    nav button.aktif{border-left:0;border-bottom-color:var(--yesil)}
+    nav .rozet{display:none}
+    main{padding:20px 16px 50px}
+    .log .satirlog{grid-template-columns:1fr;gap:2px}
+    .log .islem{text-align:left}
+  }
+</style>
+</head>
+<body>
+
+<div id="giris">
+  <div class="kutu">
+    <h1>Mod Konsolu</h1>
+    <p>Panel şifreni gir. (Railway'de <code>PANEL_KEY</code> olarak tanımladığın değer.)</p>
+    <div class="alan"><input type="password" id="anahtar" placeholder="Panel şifresi" autocomplete="current-password"></div>
+    <button class="btn" style="width:100%" onclick="girisYap()">Panele gir</button>
+    <p id="girisHata" style="color:var(--kirmizi);margin-top:12px;display:none">Şifre yanlış. Tekrar dene.</p>
+  </div>
+</div>
+
+<div class="kabuk gizli" id="kabuk">
+  <aside>
+    <div class="marka">
+      <b>Mod Konsolu</b>
+      <span id="markaKanal">—</span>
+    </div>
+    <nav id="menu">
+      <button class="aktif" data-s="durum">Durum</button>
+      <button data-s="cekilis">Çekiliş <span class="rozet" id="rzCekilis">—</span></button>
+      <button data-s="komutlar">Komutlar <span class="rozet" id="rzKomut">0</span></button>
+      <button data-s="kelimeler">Yasaklı kelimeler <span class="rozet" id="rzKelime">0</span></button>
+      <button data-s="cezalar">Ceza puanları <span class="rozet" id="rzCeza">0</span></button>
+      <button data-s="log">Moderasyon kaydı</button>
+      <button data-s="filtreler">Filtreler</button>
+      <button data-s="puanlar">Puan tablosu</button>
+    </nav>
+  </aside>
+
+  <main>
+    <!-- ============ DURUM ============ -->
+    <section data-bolum="durum">
+      <h2>Durum</h2>
+      <p class="altbaslik">Botun şu anki hâli ve hızlı işlemler.</p>
+
+      <div class="serit">
+        <div><div class="etiket">Bot</div><div class="deger" id="dGiris">—</div></div>
+        <div><div class="etiket">Yayın</div><div class="deger" id="dYayin">—</div></div>
+        <div><div class="etiket">Çekiliş</div><div class="deger" id="dCekilis">—</div></div>
+        <div><div class="etiket">Cezalı kişi</div><div class="deger" id="dCezali">—</div></div>
+        <div><div class="etiket">Toplam işlem</div><div class="deger" id="dIslem">—</div></div>
+      </div>
+
+      <div class="kart">
+        <h3>Sohbete mesaj gönder</h3>
+        <div class="satir">
+          <input id="hizliMesaj" placeholder="Sohbete düşecek mesaj" maxlength="480">
+          <button class="btn" onclick="mesajGonder()">Gönder</button>
+        </div>
+      </div>
+
+      <div class="kart">
+        <h3>Kullanıcıya ceza ver</h3>
+        <div class="satir">
+          <input id="cKullanici" placeholder="kullanıcı adı">
+          <input id="cDakika" type="number" placeholder="dakika (boş = kalıcı ban)" min="1" max="10080">
+          <input id="cSebep" placeholder="sebep">
+          <button class="btn" onclick="cezaVer()">Uygula</button>
+        </div>
+        <p class="ipucu" style="color:var(--soluk);font-size:12px;margin-top:10px">
+          Kullanıcının bu yayında en az bir kez yazmış olması gerekiyor — Kick, kullanıcı adından kimlik vermiyor.
+        </p>
+      </div>
+    </section>
+
+    <!-- ============ CEKILIS ============ -->
+    <section data-bolum="cekilis" class="gizli">
+      <h2>Çekiliş</h2>
+      <p class="altbaslik">Anahtar kelimeyi yazan herkes listeye girer. Kazananı bot sohbette duyurur.</p>
+
+      <div class="kart">
+        <h3>Kontrol</h3>
+        <div class="satir">
+          <input id="ckAnahtar" placeholder="anahtar kelime (örn: katil)" value="katil">
+          <button class="btn" onclick="cekilisIslem('basla')">Başlat</button>
+          <button class="btn" onclick="cekilisIslem('cek')">Kazananı çek</button>
+          <button class="tehlike btn" onclick="cekilisIslem('iptal')">İptal et</button>
+        </div>
+      </div>
+
+      <div class="kart">
+        <h3>Katılımcılar (<span id="ckSayi">0</span>)</h3>
+        <div id="ckKazanan" class="uyari gizli"></div>
+        <div class="bulut" id="ckListe"></div>
+        <div class="bos gizli" id="ckBos">Henüz kimse katılmadı.</div>
+      </div>
+    </section>
+
+    <!-- ============ KOMUTLAR ============ -->
+    <section data-bolum="komutlar" class="gizli">
+      <h2>Komutlar</h2>
+      <p class="altbaslik">İzleyici komutu yazdığında bot bu cevabı sohbete gönderir.</p>
+
+      <div class="kart">
+        <h3>Yeni komut ekle</h3>
+        <div class="alan">
+          <label>Komut adı (başına ! koyma)</label>
+          <input id="kAd" placeholder="discord">
+        </div>
+        <div class="alan">
+          <label>Cevap</label>
+          <textarea id="kIcerik" placeholder="Discord sunucumuz: https://discord.gg/..." maxlength="480"></textarea>
+        </div>
+        <button class="btn" onclick="komutKaydet()">Komutu kaydet</button>
+      </div>
+
+      <div class="kart">
+        <h3>Mevcut komutlar</h3>
+        <table><tbody id="komutTablo"></tbody></table>
+        <div class="bos gizli" id="komutBos">Henüz komut yok.</div>
+      </div>
+    </section>
+
+    <!-- ============ KELIMELER ============ -->
+    <section data-bolum="kelimeler" class="gizli">
+      <h2>Yasaklı kelimeler</h2>
+      <p class="altbaslik">Bot bu kelimeleri harf oyunlarıyla yazılsa da yakalar (a.m.k, 4mk, aaammkk).</p>
+
+      <div class="kart">
+        <h3>Kelime ekle</h3>
+        <div class="satir">
+          <input id="ykKelime" placeholder="kelime veya kelime grubu">
+          <select id="ykListe">
+            <option value="sohbetten">Yasaklı liste</option>
+            <option value="kufur">Küfür listesi</option>
+            <option value="sabit">Reklam / spam listesi</option>
+          </select>
+          <button class="btn" onclick="kelimeEkle()">Ekle</button>
+        </div>
+      </div>
+
+      <div class="kart">
+        <h3>Yasaklı liste <span style="text-transform:none;letter-spacing:0">— panelden ve <code>!yasakekle</code> ile eklenenler</span></h3>
+        <div class="bulut" id="ykSohbetten"></div>
+      </div>
+      <div class="kart">
+        <h3>Küfür listesi</h3>
+        <div class="bulut" id="ykKufur"></div>
+      </div>
+      <div class="kart">
+        <h3>Reklam / spam listesi</h3>
+        <div class="bulut" id="ykSabit"></div>
+      </div>
+    </section>
+
+    <!-- ============ CEZALAR ============ -->
+    <section data-bolum="cezalar" class="gizli">
+      <h2>Ceza puanları</h2>
+      <p class="altbaslik" id="cezaAlt">Puan biriktiren kullanıcılar. Temiz kalırlarsa puanlar kendiliğinden sıfırlanır.</p>
+
+      <div class="kart">
+        <table>
+          <thead><tr><th>Kullanıcı</th><th>Puan</th><th>Son ihlal</th><th>Durum</th><th></th></tr></thead>
+          <tbody id="cezaTablo"></tbody>
+        </table>
+        <div class="bos gizli" id="cezaBos">Kimsenin ceza puanı yok.</div>
+      </div>
+    </section>
+
+    <!-- ============ LOG ============ -->
+    <section data-bolum="log" class="gizli">
+      <h2>Moderasyon kaydı</h2>
+      <p class="altbaslik">Botun ve moderatörlerin yaptığı son 200 işlem.</p>
+
+      <div class="kart">
+        <div class="log" id="logListe"></div>
+        <div class="bos gizli" id="logBos">Henüz işlem yok.</div>
+        <div style="margin-top:14px"><button class="tehlike btn mini" onclick="logTemizle()">Kaydı temizle</button></div>
+      </div>
+    </section>
+
+    <!-- ============ FILTRELER ============ -->
+    <section data-bolum="filtreler" class="gizli">
+      <h2>Filtreler</h2>
+      <p class="altbaslik">Neyin ceza sebebi olduğunu ve cezanın ağırlığını buradan ayarlarsın.</p>
+
+      <div class="uyari">
+        Ağırlık = tek ihlalde eklenen ceza puanı. Ceza sırası: <b id="fSira">—</b>
+      </div>
+
+      <div class="kart">
+        <h3>Açık / kapalı</h3>
+        <div id="filtreAnahtarlar"></div>
+      </div>
+
+      <div class="kart">
+        <h3>Eşik değerleri</h3>
+        <div id="filtreEsikler"></div>
+      </div>
+
+      <div class="kart">
+        <h3>Bot davranışı</h3>
+        <div id="botAyarlar"></div>
+      </div>
+
+      <button class="btn" onclick="filtreKaydet()">Değişiklikleri kaydet</button>
+      <button class="ikincil btn" style="margin-left:8px" onclick="ayarSifirla()">Varsayılana dön</button>
+    </section>
+
+    <!-- ============ PUANLAR ============ -->
+    <section data-bolum="puanlar" class="gizli">
+      <h2>Puan tablosu</h2>
+      <p class="altbaslik">İzleyiciler sohbette yazdıkça puan kazanır.</p>
+      <div class="kart">
+        <table>
+          <thead><tr><th>#</th><th>Kullanıcı</th><th>Puan</th><th></th></tr></thead>
+          <tbody id="puanTablo"></tbody>
+        </table>
+        <div class="bos gizli" id="puanBos">Henüz puan toplayan yok.</div>
+        <div style="margin-top:14px"><button class="tehlike btn mini" onclick="puanSifirla()">Tüm puanları sıfırla</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="tost"></div>
+
+<script>
+let ANAHTAR = sessionStorage.getItem("panelKey") || "";
+let AYAR = null;
+
+// ---------- Altyapi ----------
+async function iste(yol, secenek = {}) {
+  const r = await fetch(yol, {
+    ...secenek,
+    headers: { "Content-Type": "application/json", "x-panel-key": ANAHTAR, ...(secenek.headers || {}) },
+  });
+  const veri = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(veri.hata || "İstek başarısız (" + r.status + ")");
+  return veri;
+}
+
+function tost(metin, hataMi = false) {
+  const t = document.getElementById("tost");
+  t.textContent = metin;
+  t.className = "gor" + (hataMi ? " hata" : "");
+  setTimeout(() => (t.className = ""), 2600);
+}
+
+function kacir(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---------- Giris ----------
+async function girisYap() {
+  const k = document.getElementById("anahtar").value;
+  const r = await fetch("/api/giris", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: k }),
+  }).then((x) => x.json());
+
+  if (!r.ok) {
+    document.getElementById("girisHata").style.display = "block";
+    return;
+  }
+  ANAHTAR = k;
+  sessionStorage.setItem("panelKey", k);
+  baslat();
+}
+
+document.getElementById("anahtar").addEventListener("keydown", (e) => e.key === "Enter" && girisYap());
+
+function baslat() {
+  document.getElementById("giris").classList.add("gizli");
+  document.getElementById("kabuk").classList.remove("gizli");
+  yenile();
+  setInterval(yenile, 10000);
+}
+
+// ---------- Menu ----------
+document.getElementById("menu").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-s]");
+  if (!b) return;
+  document.querySelectorAll("#menu button").forEach((x) => x.classList.remove("aktif"));
+  b.classList.add("aktif");
+  document.querySelectorAll("section[data-bolum]").forEach((s) =>
+    s.classList.toggle("gizli", s.dataset.bolum !== b.dataset.s)
+  );
+  yenile();
+});
+
+// ---------- Yenileme ----------
+async function yenile() {
+  try {
+    const d = await iste("/api/durum");
+    document.getElementById("markaKanal").textContent = d.kanal || "—";
+    document.getElementById("dGiris").innerHTML = d.giris
+      ? '<span class="nokta yesilnokta"></span>Bağlı'
+      : '<span class="nokta kirminokta"></span>Bağlı değil';
+    document.getElementById("dYayin").innerHTML = d.yayin
+      ? '<span class="nokta kirminokta"></span>Canlı'
+      : '<span class="nokta grinokta"></span>Kapalı';
+    document.getElementById("dCekilis").textContent = d.cekilis.aktif ? d.cekilis.katilimci + " kişi" : "Yok";
+    document.getElementById("dCezali").textContent = d.sayilar.cezali;
+    document.getElementById("dIslem").textContent = d.sayilar.islem;
+    document.getElementById("rzKomut").textContent = d.sayilar.komut;
+    document.getElementById("rzKelime").textContent = d.sayilar.yasakli;
+    document.getElementById("rzCeza").textContent = d.sayilar.cezali;
+    document.getElementById("rzCekilis").textContent = d.cekilis.aktif ? "açık" : "—";
+  } catch (e) {
+    if (String(e.message).includes("Şifre")) {
+      sessionStorage.removeItem("panelKey");
+      location.reload();
+    }
+  }
+
+  const aktif = document.querySelector("#menu button.aktif")?.dataset.s;
+  const yukleyici = { cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
+  if (yukleyici) yukleyici().catch((e) => tost(e.message, true));
+}
+
+// ---------- Durum islemleri ----------
+async function mesajGonder() {
+  const g = document.getElementById("hizliMesaj");
+  if (!g.value.trim()) return;
+  try {
+    await iste("/api/mesaj", { method: "POST", body: JSON.stringify({ metin: g.value }) });
+    g.value = "";
+    tost("Mesaj gönderildi.");
+  } catch (e) { tost(e.message, true); }
+}
+
+async function cezaVer() {
+  const kullanici = document.getElementById("cKullanici").value.trim();
+  const dakika = document.getElementById("cDakika").value;
+  const sebep = document.getElementById("cSebep").value.trim();
+  if (!kullanici) return tost("Kullanıcı adı gerekli.", true);
+  try {
+    await iste("/api/ceza", { method: "POST", body: JSON.stringify({ kullanici, dakika: dakika || null, sebep }) });
+    tost(dakika ? kullanici + " " + dakika + " dk susturuldu." : kullanici + " banlandı.");
+    document.getElementById("cKullanici").value = "";
+    document.getElementById("cDakika").value = "";
+    document.getElementById("cSebep").value = "";
+    yenile();
+  } catch (e) { tost(e.message, true); }
+}
+
+// ---------- Cekilis ----------
+async function cekilisYukle() {
+  const c = await iste("/api/cekilis");
+  document.getElementById("ckSayi").textContent = c.katilimcilar.length;
+  if (c.anahtar) document.getElementById("ckAnahtar").value = c.anahtar;
+
+  const kz = document.getElementById("ckKazanan");
+  kz.classList.toggle("gizli", !c.kazanan);
+  if (c.kazanan) kz.innerHTML = "🏆 Son kazanan: <b>" + kacir(c.kazanan) + "</b>";
+
+  document.getElementById("ckBos").classList.toggle("gizli", c.katilimcilar.length > 0);
+  document.getElementById("ckListe").innerHTML = c.katilimcilar
+    .map((k) => '<span class="cip">' + kacir(k) + "</span>")
+    .join("");
+}
+
+async function cekilisIslem(islem) {
+  if (islem === "iptal" && !confirm("Çekiliş iptal edilsin mi? Katılımcı listesi silinir.")) return;
+  try {
+    const r = await iste("/api/cekilis", {
+      method: "POST",
+      body: JSON.stringify({ islem, anahtar: document.getElementById("ckAnahtar").value }),
+    });
+    tost(islem === "cek" ? "Kazanan: " + r.kazanan : islem === "basla" ? "Çekiliş başladı." : "Çekiliş iptal edildi.");
+    yenile();
+  } catch (e) { tost(e.message, true); }
+}
+
+// ---------- Komutlar ----------
+async function komutYukle() {
+  const k = await iste("/api/komutlar");
+  const girdiler = Object.entries(k);
+  document.getElementById("komutBos").classList.toggle("gizli", girdiler.length > 0);
+  document.getElementById("komutTablo").innerHTML = girdiler
+    .map(
+      ([ad, icerik]) =>
+        '<tr><td class="mono" style="width:130px;color:var(--yesil)">!' + kacir(ad) + "</td>" +
+        "<td>" + kacir(icerik) + "</td>" +
+        '<td style="width:150px;text-align:right">' +
+        '<button class="ikincil btn mini" onclick="komutDuzenle(\'' + kacir(ad) + '\')">Düzenle</button> ' +
+        '<button class="tehlike btn mini" onclick="komutSil(\'' + kacir(ad) + '\')">Sil</button></td></tr>'
+    )
+    .join("");
+}
+
+async function komutKaydet() {
+  const ad = document.getElementById("kAd").value;
+  const icerik = document.getElementById("kIcerik").value;
+  try {
+    await iste("/api/komutlar", { method: "PUT", body: JSON.stringify({ ad, icerik }) });
+    document.getElementById("kAd").value = "";
+    document.getElementById("kIcerik").value = "";
+    tost("Komut kaydedildi.");
+    komutYukle();
+    yenile();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function komutDuzenle(ad) {
+  const k = await iste("/api/komutlar");
+  document.getElementById("kAd").value = ad;
+  document.getElementById("kIcerik").value = k[ad] || "";
+  document.getElementById("kIcerik").focus();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function komutSil(ad) {
+  if (!confirm('"!' + ad + '" komutu silinsin mi?')) return;
+  await iste("/api/komutlar/" + encodeURIComponent(ad), { method: "DELETE" });
+  tost("Komut silindi.");
+  komutYukle();
+  yenile();
+}
+
+// ---------- Kelimeler ----------
+async function kelimeYukle() {
+  const y = await iste("/api/yasakli");
+  const ciz = (liste, kod) =>
+    liste.length
+      ? liste
+          .map(
+            (k) =>
+              '<span class="cip">' + kacir(k) +
+              '<button onclick="kelimeSil(\'' + kacir(k).replace(/'/g, "\\'") + "','" + kod + '\')">×</button></span>'
+          )
+          .join("")
+      : '<span style="color:var(--soluk);font-size:13px">Liste boş.</span>';
+
+  document.getElementById("ykSohbetten").innerHTML = ciz(y.sohbetten, "sohbetten");
+  document.getElementById("ykKufur").innerHTML = ciz(y.kufur, "kufur");
+  document.getElementById("ykSabit").innerHTML = ciz(y.sabit, "sabit");
+}
+
+async function kelimeEkle() {
+  const kelime = document.getElementById("ykKelime").value.trim();
+  const liste = document.getElementById("ykListe").value;
+  if (!kelime) return;
+  try {
+    await iste("/api/yasakli", { method: "POST", body: JSON.stringify({ kelime, liste }) });
+    document.getElementById("ykKelime").value = "";
+    tost('"' + kelime + '" eklendi.');
+    kelimeYukle();
+    yenile();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function kelimeSil(kelime, liste) {
+  await iste("/api/yasakli?kelime=" + encodeURIComponent(kelime) + "&liste=" + liste, { method: "DELETE" });
+  tost('"' + kelime + '" çıkarıldı.');
+  kelimeYukle();
+  yenile();
+}
+
+// ---------- Cezalar ----------
+async function cezaYukle() {
+  const c = await iste("/api/cezalar");
+  document.getElementById("cezaBos").classList.toggle("gizli", c.length > 0);
+  document.getElementById("cezaTablo").innerHTML = c
+    .map(
+      (x) =>
+        "<tr>" +
+        '<td class="mono">' + kacir(x.kullanici) + "</td>" +
+        '<td class="mono" style="color:' + (x.puan >= 4 ? "var(--kirmizi)" : x.puan >= 2 ? "var(--amber)" : "var(--metin)") + '">' + x.puan + "</td>" +
+        '<td class="mono" style="color:var(--soluk);font-size:12px">' + new Date(x.sonIhlal).toLocaleString("tr-TR") + "</td>" +
+        "<td>" + (x.gecerli ? "Aktif" : '<span style="color:var(--soluk)">Süresi doldu</span>') + "</td>" +
+        '<td style="text-align:right"><button class="btn mini" onclick="af(\'' + kacir(x.kullanici) + '\')">Affet</button></td>' +
+        "</tr>"
+    )
+    .join("");
+}
+
+async function af(kullanici) {
+  const r = await iste("/api/af", { method: "POST", body: JSON.stringify({ kullanici }) });
+  tost(kullanici + " affedildi." + (r.banKalkti ? " Susturma da kaldırıldı." : ""));
+  cezaYukle();
+  yenile();
+}
+
+// ---------- Log ----------
+async function logYukle() {
+  const l = await iste("/api/log");
+  document.getElementById("logBos").classList.toggle("gizli", l.length > 0);
+  document.getElementById("logListe").innerHTML = l
+    .map(
+      (x) =>
+        '<div class="satirlog">' +
+        '<span class="zaman">' + new Date(x.zaman).toLocaleString("tr-TR") + "</span>" +
+        '<span><span class="kul">' + kacir(x.kullanici) + '</span> <span class="sebep">' + kacir(x.sebep) + "</span></span>" +
+        '<span class="islem i-' + kacir(x.islem) + '">' + kacir(x.islem) + (x.sure ? " " + x.sure + "dk" : "") + "</span>" +
+        "</div>"
+    )
+    .join("");
+}
+
+async function logTemizle() {
+  if (!confirm("Tüm moderasyon kaydı silinsin mi? Geri alınamaz.")) return;
+  await iste("/api/log", { method: "DELETE" });
+  tost("Kayıt temizlendi.");
+  logYukle();
+  yenile();
+}
+
+// ---------- Filtreler ----------
+const FILTRE_ADLARI = {
+  kufur: ["Küfür ve hakaret", "Listedeki kelimeler, harf oyunları dahil"],
+  yasakli_kelimeler: ["Reklam / spam kelimeleri", "Bahis siteleri, rakip kanal, vb."],
+  link: ["İzinsiz link", "İzin listesi dışındaki tüm bağlantılar"],
+  buyuk_harf: ["Aşırı büyük harf", "BAĞIRMA tarzı mesajlar"],
+  emote_spam: ["Emote spam", "Tek mesajda çok fazla emote"],
+  karakter_spam: ["Karakter spam", "aaaaaaa / !!!!!!! gibi"],
+  flood: ["Flood", "Çok kısa sürede çok mesaj"],
+  ayni_mesaj: ["Aynı mesaj tekrarı", "Kopyala-yapıştır spam"],
+  uzun_mesaj: ["Çok uzun mesaj", "Belirlenen karakter sınırını aşanlar"],
+};
+
+async function filtreYukle() {
+  AYAR = await iste("/api/ayarlar");
+  const f = AYAR.filtreler;
+
+  document.getElementById("fSira").textContent = (AYAR.cezalar.adimlar || [])
+    .map((a, i) => (i + 1) + ") " + (a.islem === "ban" ? "kalıcı ban" : a.islem === "timeout" ? a.sure + " dk susturma" : "uyarı"))
+    .join("  →  ");
+
+  document.getElementById("filtreAnahtarlar").innerHTML = Object.keys(FILTRE_ADLARI)
+    .filter((k) => f[k])
+    .map(
+      (k) =>
+        '<div class="anahtar"><div><div class="ad">' + FILTRE_ADLARI[k][0] + "</div>" +
+        '<div class="ipucu">' + FILTRE_ADLARI[k][1] + "</div></div>" +
+        '<label class="kaydir"><input type="checkbox" data-f="' + k + '"' + (f[k].aktif ? " checked" : "") + "><span></span></label></div>"
+    )
+    .join("");
+
+  const esikAlan = (etiket, yol, deger, ipucu) =>
+    '<div class="alan"><label>' + etiket + (ipucu ? ' <span style="color:var(--cizgi2)">— ' + ipucu + "</span>" : "") + "</label>" +
+    '<input type="number" step="any" data-yol="' + yol + '" value="' + deger + '"></div>';
+
+  document.getElementById("filtreEsikler").innerHTML =
+    '<div class="satir">' +
+    esikAlan("Küfür ağırlığı", "filtreler.kufur.ceza_agirligi", f.kufur.ceza_agirligi, "1 = önce uyarı") +
+    esikAlan("Link ağırlığı", "filtreler.link.ceza_agirligi", f.link.ceza_agirligi) +
+    esikAlan("Reklam ağırlığı", "filtreler.yasakli_kelimeler.ceza_agirligi", f.yasakli_kelimeler.ceza_agirligi) +
+    "</div><div class='satir'>" +
+    esikAlan("Büyük harf oranı", "filtreler.buyuk_harf.max_oran", f.buyuk_harf.max_oran, "0.7 = %70") +
+    esikAlan("Max emote", "filtreler.emote_spam.max_emote", f.emote_spam.max_emote) +
+    esikAlan("Max karakter tekrarı", "filtreler.karakter_spam.max_tekrar", f.karakter_spam.max_tekrar) +
+    "</div><div class='satir'>" +
+    esikAlan("Flood: saniye", "filtreler.flood.saniye", f.flood.saniye) +
+    esikAlan("Flood: max mesaj", "filtreler.flood.max_mesaj", f.flood.max_mesaj) +
+    esikAlan("Puan sıfırlanma (dk)", "cezalar.puan_sifirlama_dakika", AYAR.cezalar.puan_sifirlama_dakika, "temiz kalınca") +
+    "</div>";
+
+  document.getElementById("botAyarlar").innerHTML =
+    '<div class="anahtar"><div><div class="ad">Sohbete yazsın</div><div class="ipucu">Kapatırsan bot sessizce moderasyon yapar</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-yol="bot.sohbete_yazsin"' + (AYAR.bot.sohbete_yazsin ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="anahtar"><div><div class="ad">Uyarı mesajları</div><div class="ipucu">Ceza verince sohbete sebep yazsın</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-yol="bot.uyari_mesajlari_acik"' + (AYAR.bot.uyari_mesajlari_acik ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="anahtar"><div><div class="ad">Moderatörler muaf</div><div class="ipucu">Modlara ve yayıncıya ceza verilmez</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-yol="bagisiklik.moderatorler"' + (AYAR.bagisiklik.moderatorler ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="anahtar"><div><div class="ad">Aboneler link atabilir</div><div class="ipucu">Abonelere link filtresi uygulanmaz</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-yol="filtreler.link.aboneler_link_atabilir"' + (AYAR.filtreler.link.aboneler_link_atabilir ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="anahtar"><div><div class="ad">Otomatik duyurular</div><div class="ipucu">Belirli aralıkla mesaj gönder</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-yol="otomatik_mesajlar.aktif"' + (AYAR.otomatik_mesajlar.aktif ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="alan" style="margin-top:14px"><label>Otomatik duyuru aralığı (dakika)</label>' +
+    '<input type="number" data-yol="otomatik_mesajlar.dakika" value="' + AYAR.otomatik_mesajlar.dakika + '"></div>' +
+    '<div class="alan"><label>Otomatik duyurular (her satır bir mesaj)</label>' +
+    '<textarea data-yol="otomatik_mesajlar.mesajlar" data-tip="satirlar">' + kacir((AYAR.otomatik_mesajlar.mesajlar || []).join("\n")) + "</textarea></div>";
+}
+
+function yolaYaz(nesne, yol, deger) {
+  const p = yol.split(".");
+  let h = nesne;
+  for (let i = 0; i < p.length - 1; i++) h = h[p[i]];
+  h[p[p.length - 1]] = deger;
+}
+
+async function filtreKaydet() {
+  if (!AYAR) return;
+  document.querySelectorAll("[data-f]").forEach((el) => {
+    AYAR.filtreler[el.dataset.f].aktif = el.checked;
+  });
+  document.querySelectorAll("[data-yol]").forEach((el) => {
+    let deger;
+    if (el.type === "checkbox") deger = el.checked;
+    else if (el.dataset.tip === "satirlar") deger = el.value.split("\n").map((s) => s.trim()).filter(Boolean);
+    else if (el.type === "number") deger = Number(el.value);
+    else deger = el.value;
+    yolaYaz(AYAR, el.dataset.yol, deger);
+  });
+  try {
+    await iste("/api/ayarlar", { method: "PUT", body: JSON.stringify(AYAR) });
+    tost("Ayarlar kaydedildi. Hemen geçerli.");
+    filtreYukle();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function ayarSifirla() {
+  if (!confirm("Tüm ayarlar varsayılana döner. Eklediğin komutlar ve kelimeler silinir. Devam?")) return;
+  await iste("/api/ayarlar/sifirla", { method: "POST" });
+  tost("Ayarlar sıfırlandı.");
+  filtreYukle();
+  yenile();
+}
+
+// ---------- Puanlar ----------
+async function puanYukle() {
+  const p = await iste("/api/puanlar");
+  document.getElementById("puanBos").classList.toggle("gizli", p.length > 0);
+  document.getElementById("puanTablo").innerHTML = p
+    .map(
+      (x, i) =>
+        '<tr><td class="mono" style="width:40px;color:var(--soluk)">' + (i + 1) + "</td>" +
+        '<td class="mono">' + kacir(x.kullanici) + "</td>" +
+        '<td class="mono" style="color:var(--yesil)">' + x.puan + "</td>" +
+        '<td style="text-align:right"><button class="ikincil btn mini" onclick="puanSil(\'' + kacir(x.kullanici) + '\')">Sıfırla</button></td></tr>'
+    )
+    .join("");
+}
+
+async function puanSil(kullanici) {
+  await iste("/api/puanlar?kullanici=" + encodeURIComponent(kullanici), { method: "DELETE" });
+  puanYukle();
+}
+
+async function puanSifirla() {
+  if (!confirm("Herkesin puanı sıfırlansın mı? Geri alınamaz.")) return;
+  await iste("/api/puanlar", { method: "DELETE" });
+  tost("Puanlar sıfırlandı.");
+  puanYukle();
+}
+
+// ---------- Baslangic ----------
+if (ANAHTAR) {
+  fetch("/api/durum", { headers: { "x-panel-key": ANAHTAR } }).then((r) => {
+    if (r.ok) baslat();
+    else sessionStorage.removeItem("panelKey");
+  });
+}
+</script>
+</body>
+</html>

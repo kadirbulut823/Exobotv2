@@ -19,7 +19,11 @@ export function panelRouter(ctx) {
   const kilit = (req, res, next) => {
     const anahtar = process.env.PANEL_KEY;
     if (!anahtar) return res.status(500).json({ hata: "PANEL_KEY tanımlı değil. Railway → Variables'a ekle." });
-    const gelen = req.get("x-panel-key") || req.query.key;
+    let gelen = req.get("x-panel-key") || req.query.key || "";
+    // Tarayici Turkce karakterli sifreyi URL-kodlanmis gonderir, cozuyoruz
+    try {
+      gelen = decodeURIComponent(gelen);
+    } catch {}
     if (gelen !== anahtar) return res.status(401).json({ hata: "Şifre yanlış." });
     next();
   };

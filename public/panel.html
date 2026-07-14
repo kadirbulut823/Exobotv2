@@ -459,6 +459,10 @@
 <script>
 let ANAHTAR = sessionStorage.getItem("panelKey") || "";
 let AYAR = null;
+// Form alanlari (filtreler, oyun ayarlari) yalnizca sekmeye ilk girildiginde cizilir.
+// Yoksa otomatik yenileme sirasinda yazdiklarin silinir.
+let filtreCizildi = false;
+let oyunAyarCizildi = false;
 
 // ---------- Altyapi ----------
 async function iste(yol, secenek = {}) {
@@ -520,6 +524,8 @@ document.getElementById("menu").addEventListener("click", (e) => {
   document.querySelectorAll("section[data-bolum]").forEach((s) =>
     s.classList.toggle("gizli", s.dataset.bolum !== b.dataset.s)
   );
+  filtreCizildi = false;
+  oyunAyarCizildi = false;
   yenile();
 });
 
@@ -679,7 +685,10 @@ async function oyunYukle() {
     aa.classList.add("gizli");
   }
 
-  // Ayarlar
+  // Ayar formu SADECE bir kez cizilir (yazarken silinmesin diye)
+  if (oyunAyarCizildi) return;
+  oyunAyarCizildi = true;
+
   AYAR = await iste("/api/ayarlar");
   const o = AYAR.oyunlar;
   if (!o || !AYAR.anket) {
@@ -700,8 +709,12 @@ async function oyunYukle() {
     '<div class="satir">' +
     Object.keys(o.oduller).map((t) => '<div class="alan"><label>Ödül: ' + t + '</label><input type="number" data-oy="oyunlar.oduller.' + t + '" value="' + o.oduller[t] + '"></div>').join("") +
     "</div>" +
-    '<div class="alan"><label>Kelime havuzu (virgülle ayır)</label><textarea data-oy="oyunlar.kelime_havuzu" data-tip="virgul">' + kacir(o.kelime_havuzu.join(", ")) + "</textarea></div>" +
-    '<div class="alan"><label>Quiz soruları (her satır: <code>Soru?|Cevap</code>)</label><textarea data-oy="oyunlar.quiz_sorulari" data-tip="satirlar" style="min-height:130px">' + kacir(o.quiz_sorulari.join("\n")) + "</textarea></div>";
+    '<div class="alan"><label>Karışık kelime havuzu — <b>her satıra bir kelime</b> (' + o.kelime_havuzu.length + ' kelime)</label>' +
+    '<textarea data-oy="oyunlar.kelime_havuzu" data-tip="satirlar" style="min-height:160px">' + kacir(o.kelime_havuzu.join("\n")) + "</textarea></div>" +
+    '<div class="alan"><label>Hızlı yazma kelimeleri — <b>her satıra bir kelime</b></label>' +
+    '<textarea data-oy="oyunlar.hizli_kelimeler" data-tip="satirlar" style="min-height:100px">' + kacir((o.hizli_kelimeler || []).join("\n")) + "</textarea></div>" +
+    '<div class="alan"><label>Quiz soruları — <b>her satıra bir soru</b>, biçim: <code>Soru?|Cevap</code> (' + o.quiz_sorulari.length + ' soru)</label>' +
+    '<textarea data-oy="oyunlar.quiz_sorulari" data-tip="satirlar" style="min-height:180px">' + kacir(o.quiz_sorulari.join("\n")) + "</textarea></div>";
 }
 
 async function oyunBaslat(tip) {
@@ -735,7 +748,7 @@ async function anketBitir() {
 }
 
 async function oyunAyarKaydet() {
-  if (!AYAR) AYAR = await iste("/api/ayarlar");
+  if (!AYAR) return tost("Ayarlar yüklenmedi, sayfayı yenile.", true);
   document.querySelectorAll("[data-oy]").forEach((el) => {
     let deger;
     if (el.type === "checkbox") deger = el.checked;
@@ -977,6 +990,10 @@ const FILTRE_ADLARI = {
 };
 
 async function filtreYukle() {
+  // Form SADECE bir kez cizilir; otomatik yenileme yazdiklarini silmesin
+  if (filtreCizildi) return;
+  filtreCizildi = true;
+
   AYAR = await iste("/api/ayarlar");
   const f = AYAR.filtreler;
 
@@ -1057,7 +1074,6 @@ async function filtreKaydet() {
   try {
     await iste("/api/ayarlar", { method: "PUT", body: JSON.stringify(AYAR) });
     tost("Ayarlar kaydedildi. Hemen geçerli.");
-    filtreYukle();
   } catch (e) { tost(e.message, true); }
 }
 
@@ -1065,6 +1081,7 @@ async function ayarSifirla() {
   if (!confirm("Tüm ayarlar varsayılana döner. Eklediğin komutlar ve kelimeler silinir. Devam?")) return;
   await iste("/api/ayarlar/sifirla", { method: "POST" });
   tost("Ayarlar sıfırlandı.");
+  filtreCizildi = false;
   filtreYukle();
   yenile();
 }

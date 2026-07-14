@@ -64,6 +64,48 @@ export function panelRouter(ctx) {
     });
   });
 
+  // ---------------- Kanal degistirme ----------------
+  r.post("/api/kanal", kilit, async (req, res) => {
+    const slug = String(req.body?.slug || "")
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\/(www\.)?kick\.com\//, "") // tam link yapistirilirsa
+      .replace(/\/$/, "");
+
+    if (!slug) return res.status(400).json({ hata: "Kanal adı boş olamaz." });
+    if (!kick.girisYapildiMi()) return res.status(400).json({ hata: "Bot giriş yapmamış. Önce /auth'tan giriş yap." });
+
+    // 1) Kanal gercekten var mi?
+    let bilgi;
+    try {
+      bilgi = await kick.kanalBilgisi(slug);
+    } catch (e) {
+      return res.status(500).json({ hata: "Kick'e ulaşılamadı: " + e.message });
+    }
+    if (!bilgi) return res.status(404).json({ hata: `"${slug}" adında bir kanal bulunamadı.` });
+
+    // 2) Ayara yaz, onbellegi sifirla
+    const c = ayar.get();
+    c.kanal.slug = bilgi.slug || slug;
+    ayar.kaydet(c);
+    ctx.kanalSifirla?.();
+
+    // 3) Webhook aboneligini yeni kanala tasi (bu olmadan mesajlar gelmez)
+    let abonelik = "OK";
+    try {
+      await kick.abonelikleriYenile(bilgi.broadcaster_user_id);
+    } catch (e) {
+      abonelik = e.message;
+    }
+
+    res.json({
+      ok: true,
+      slug: c.kanal.slug,
+      kanalId: bilgi.broadcaster_user_id,
+      abonelik,
+    });
+  });
+
   // ---------------- Ayarlar ----------------
   r.get("/api/ayarlar", kilit, (_req, res) => res.json(ayar.get()));
 

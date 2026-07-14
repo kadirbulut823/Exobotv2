@@ -73,6 +73,7 @@ export function panelRouter(ctx) {
       return res.status(400).json({ hata: "Ayarlar geçersiz." });
     }
     ayar.kaydet(yeni);
+    ctx.kanalSifirla?.(); // kanal adi degismis olabilir
     res.json({ ok: true });
   });
 

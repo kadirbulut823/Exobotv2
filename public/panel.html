@@ -303,6 +303,28 @@
       <h2>Filtreler</h2>
       <p class="altbaslik">Neyin ceza sebebi olduğunu ve cezanın ağırlığını buradan ayarlarsın.</p>
 
+      <div class="kart">
+        <h3>Kanal ve bot</h3>
+        <div class="satir">
+          <div class="alan">
+            <label>Kanal adı (kick.com/<b>bu-kısım</b>)</label>
+            <input data-yol="kanal.slug" id="fKanal" placeholder="kanaladi">
+          </div>
+          <div class="alan">
+            <label>Bot nasıl yazsın</label>
+            <select data-yol="bot.mesaj_tipi" id="fTip">
+              <option value="user">Hesap adıyla (önerilen)</option>
+              <option value="bot">BOT rozetiyle</option>
+            </select>
+          </div>
+          <div class="alan">
+            <label>Komut işareti</label>
+            <input data-yol="bot.prefix" id="fPrefix" maxlength="2">
+          </div>
+        </div>
+        <p style="color:var(--soluk);font-size:12px">Kanal adını değiştirirsen bot yeni kanala geçer — bot hesabının orada da moderatör olması gerekir.</p>
+      </div>
+
       <div class="uyari">
         Ağırlık = tek ihlalde eklenen ceza puanı. Ceza sırası: <b id="fSira">—</b>
       </div>
@@ -649,6 +671,10 @@ async function filtreYukle() {
   document.getElementById("fSira").textContent = (AYAR.cezalar.adimlar || [])
     .map((a, i) => (i + 1) + ") " + (a.islem === "ban" ? "kalıcı ban" : a.islem === "timeout" ? a.sure + " dk susturma" : "uyarı"))
     .join("  →  ");
+
+  document.getElementById("fKanal").value = AYAR.kanal.slug || "";
+  document.getElementById("fTip").value = AYAR.bot.mesaj_tipi === "bot" ? "bot" : "user";
+  document.getElementById("fPrefix").value = AYAR.bot.prefix || "!";
 
   document.getElementById("filtreAnahtarlar").innerHTML = Object.keys(FILTRE_ADLARI)
     .filter((k) => f[k])

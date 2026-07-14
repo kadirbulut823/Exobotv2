@@ -16,6 +16,7 @@ export function oyunDurumu() {
     kalanSaniye: Math.max(0, Math.round((oyun.bitis - Date.now()) / 1000)),
     odul: oyun.odul,
     cevap: oyun.cevap, // sadece panelde gosterilir
+    anlam: oyun.veri?.anlam || null,
   };
 }
 
@@ -84,10 +85,19 @@ export function oyunBaslat(tip, config) {
   let cevap, gorunen, veri = {};
 
   if (tip === "kelime") {
-    const havuz = (o.kelime_havuzu || []).filter((k) => k && k.length >= 4);
+    // Havuz bicimi: "kelime" veya "kelime|anlami"
+    const havuz = (o.kelime_havuzu || [])
+      .map((satir) => {
+        const [k, ...rest] = String(satir).split("|");
+        return { kelime: k.trim(), anlam: rest.join("|").trim() || null };
+      })
+      .filter((x) => x.kelime.length >= 4);
+
     if (!havuz.length) return { ok: false, hata: "Kelime havuzu boş." };
-    cevap = rastgele(havuz);
+    const secim = rastgele(havuz);
+    cevap = secim.kelime;
     gorunen = karistir(cevap);
+    veri = { anlam: secim.anlam };
   } else if (tip === "quiz") {
     const havuz = (o.quiz_sorulari || []).filter((s) => s.includes("|"));
     if (!havuz.length) return { ok: false, hata: "Quiz soru havuzu boş." };
@@ -100,7 +110,8 @@ export function oyunBaslat(tip, config) {
     gorunen = `1 ile ${max} arasında bir sayı tuttum`;
     veri = { max, alt: 1, ust: max };
   } else if (tip === "hizli") {
-    const havuz = (o.hizli_kelimeler || []).length ? o.hizli_kelimeler : o.kelime_havuzu || [];
+    const kaynak = (o.hizli_kelimeler || []).length ? o.hizli_kelimeler : o.kelime_havuzu || [];
+    const havuz = kaynak.map((x) => String(x).split("|")[0].trim()).filter(Boolean);
     if (!havuz.length) return { ok: false, hata: "Kelime havuzu boş." };
     cevap = rastgele(havuz);
     gorunen = cevap;
@@ -156,7 +167,15 @@ export function oyunKontrol(icerik, sender) {
 
   const kazanan = { kullanici: sender.username, odul: oyun.odul, tip: oyun.tip, cevap: oyun.cevap };
   const gecen = ((Date.now() - oyun.baslangic) / 1000).toFixed(1);
-  kazanan.duyuru = `🏅 @${sender.username} bildi! Cevap: ${oyun.cevap} — ${oyun.odul} puan kazandı. (${gecen} sn)`;
+
+  let metin = `🏅 @${sender.username} bildi! Cevap: ${oyun.cevap.toLocaleUpperCase("tr-TR")} — ${oyun.odul} puan kazandı. (${gecen} sn)`;
+  // Kelime oyununda anlam tanimliysa sohbete ogretici not dus
+  if (oyun.veri?.anlam) {
+    metin += ` 📖 ${oyun.cevap.toLocaleUpperCase("tr-TR")}: ${oyun.veri.anlam}`;
+  }
+  kazanan.duyuru = metin.slice(0, 490); // Kick 500 karakter siniri
+  kazanan.anlam = oyun.veri?.anlam || null;
+
   oyun = null;
   return kazanan;
 }
@@ -164,18 +183,22 @@ export function oyunKontrol(icerik, sender) {
 // Suresi dolan oyunu kapatir. Kapandiysa duyuru dondurur.
 export function oyunSureKontrol() {
   if (!oyun || Date.now() < oyun.bitis) return null;
+
   const cevap = oyun.cevap;
-  const ipucu =
-    oyun.tip === "sayi" ? ` (Aralık: ${oyun.veri.alt}-${oyun.veri.ust})` : "";
+  let ek = "";
+  if (oyun.tip === "sayi") ek = ` (Aralık: ${oyun.veri.alt}-${oyun.veri.ust})`;
+  else if (oyun.veri?.anlam) ek = ` 📖 ${cevap.toLocaleUpperCase("tr-TR")}: ${oyun.veri.anlam}`;
+
   oyun = null;
-  return `⏰ Süre doldu! Kimse bilemedi. Doğru cevap: ${cevap}${ipucu}`;
+  return `⏰ Süre doldu! Kimse bilemedi. Doğru cevap: ${cevap.toLocaleUpperCase("tr-TR")}${ek}`.slice(0, 490);
 }
 
 export function oyunBitir() {
   if (!oyun) return null;
   const cevap = oyun.cevap;
+  const anlam = oyun.veri?.anlam;
   oyun = null;
-  return `Oyun iptal edildi. Cevap: ${cevap}`;
+  return `Oyun iptal edildi. Cevap: ${cevap.toLocaleUpperCase("tr-TR")}${anlam ? ` 📖 ${anlam}` : ""}`.slice(0, 490);
 }
 
 // ---------- Anket ----------

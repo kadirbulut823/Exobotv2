@@ -24,13 +24,30 @@ const GOMULU = {
     sure_saniye: 120,
     oduller: { kelime: 50, quiz: 50, sayi: 75, hizli: 30, matematik: 40 },
     otomatik: { aktif: false, dakika: 30, sadece_yayin_acikken: true },
+    // Bicim: "kelime"  ya da  "kelime|anlami"
+    // Anlam yazarsan, kelime bilindiginde bot sohbete anlamini da yazar.
     kelime_havuzu: [
+      // --- Zor kelimeler (anlamli ornekler) ---
+      "muteakip|Arkasindan gelen, sonraki",
+      "mustesna|Ayricalikli, benzerlerinden ustun",
+      "tahakkum|Baskı kurma, zorbalık",
+      "muphem|Belirsiz, anlasilmasi guc",
+      "izafi|Goreceli, bakis acisina gore degisen",
+      "mutabakat|Anlasma, uzlasma",
+      "tevazu|Alcakgonulluluk",
+      "sarih|Acik, net, anlasilir",
+      "muzmin|Kronik, surekli tekrarlayan",
+      "hercai|Kararsiz, bir seye baglanmayan",
+      "lakayt|Ilgisiz, umursamaz",
+      "mahcup|Utangac, sikilgan",
+      "muteessir|Uzulmus, etkilenmis",
+      "sadakat|Baglilik, vefa",
+      "ihtiras|Asiri istek, tutku",
+      // --- Kolay kelimeler ---
       "yayin","sohbet","moderator","klavye","bilgisayar","kahve","muzik","futbol","basketbol","kitap",
       "sinema","telefon","internet","oyuncu","kamera","mikrofon","ekran","kulaklik","masa","sandalye",
-      "pencere","anahtar","kalem","defter","canta","ayakkabi","gozluk","saat","takvim","harita",
-      "deniz","dagci","orman","yildiz","gunes","bulut","yagmur","kar","ruzgar","toprak",
-      "elma","karpuz","cilek","muz","portakal","domates","patates","peynir","ekmek","corba",
-      "kaplan","kartal","balina","kelebek","yunus","tavsan","sincap","penguen","zurafa","timsah"
+      "deniz","orman","yildiz","gunes","bulut","yagmur","ruzgar","toprak","kelebek","penguen",
+      "elma","karpuz","cilek","portakal","domates","peynir","ekmek","corba","kaplan","kartal"
     ],
     hizli_kelimeler: ["hizli","kazandim","buradayim","yakala","simsek","roket","firtina","atesle","kaptan","zafer"],
     quiz_sorulari: [

@@ -8,6 +8,8 @@ import * as store from "./store.js";
 import * as ayar from "./config.js";
 import * as mod from "./moderation.js";
 import * as cmd from "./commands.js";
+import * as games from "./games.js";
+import * as chatlog from "./chatlog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -55,6 +57,8 @@ export function panelRouter(ctx) {
       kanalId: kanal?.broadcaster_user_id || null,
       yayin: ctx.yayinDurumu(),
       cekilis: { aktif: ck.aktif, anahtar: ck.anahtar, katilimci: cmd.cekilisKatilimciSayisi(), kazanan: ck.kazanan },
+      oyun: games.oyunDurumu(),
+      anket: games.anketDurumu(),
       sayilar: {
         islem: db.ban_gecmisi.length,
         cezali: Object.keys(db.cezalar || {}).length,
@@ -62,6 +66,73 @@ export function panelRouter(ctx) {
         komut: Object.keys(c.komutlar || {}).filter((a) => !a.startsWith("_")).length,
       },
     });
+  });
+
+  // ---------------- Canli sohbet ----------------
+  r.get("/api/sohbet", kilit, (req, res) => {
+    const sonNo = Number(req.query.sonNo || 0);
+    res.json(sonNo > 0 ? chatlog.getir(sonNo) : chatlog.hepsi());
+  });
+
+  // Panelden tek mesaj silme
+  r.post("/api/sohbet/sil", kilit, async (req, res) => {
+    const id = String(req.body?.id || "");
+    if (!id) return res.status(400).json({ hata: "Mesaj kimliği gerekli." });
+    try {
+      await kick.mesajSil(id);
+      chatlog.silindiIsaretle(id, "Panelden silindi");
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ hata: e.message });
+    }
+  });
+
+  // ---------------- Oyunlar ----------------
+  r.get("/api/oyun", kilit, (_req, res) => {
+    res.json({ oyun: games.oyunDurumu(), anket: games.anketDurumu(), tipler: games.OYUN_TIPLERI });
+  });
+
+  r.post("/api/oyun", kilit, async (req, res) => {
+    const islem = String(req.body?.islem || "basla");
+    const c = ayar.get();
+
+    if (islem === "bitir") {
+      const m = games.oyunBitir();
+      if (m) await ctx.duyur(m).catch(() => {});
+      return res.json({ ok: true });
+    }
+
+    const r2 = games.oyunBaslat(String(req.body?.tip || "rastgele"), c);
+    if (!r2.ok) return res.status(400).json({ hata: r2.hata });
+    try {
+      await ctx.duyur(r2.duyuru);
+    } catch (e) {
+      games.oyunBitir(); // duyuru gitmediyse oyunu yarim birakma
+      return res.status(500).json({ hata: "Sohbete yazılamadı, oyun iptal edildi: " + e.message });
+    }
+    res.json({ ok: true, tip: r2.tip });
+  });
+
+  // ---------------- Anket ----------------
+  r.post("/api/anket", kilit, async (req, res) => {
+    const islem = String(req.body?.islem || "basla");
+    const c = ayar.get();
+
+    if (islem === "bitir") {
+      const m = games.anketBitir();
+      if (m) await ctx.duyur(m).catch(() => {});
+      return res.json({ ok: true });
+    }
+
+    const r2 = games.anketBaslat(req.body?.soru, req.body?.secenekler, c);
+    if (!r2.ok) return res.status(400).json({ hata: r2.hata });
+    try {
+      await ctx.duyur(r2.duyuru);
+    } catch (e) {
+      games.anketBitir(); // duyuru gitmediyse anketi yarim birakma
+      return res.status(500).json({ hata: "Sohbete yazılamadı, anket iptal edildi: " + e.message });
+    }
+    res.json({ ok: true });
   });
 
   // ---------------- Kanal degistirme ----------------

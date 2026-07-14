@@ -108,6 +108,29 @@
   .gizli{display:none!important}
   .uyari{background:#1a1408;border:1px solid #3d2f10;color:var(--amber);padding:10px 12px;border-radius:3px;font-size:12.5px;margin-bottom:14px}
 
+  /* --- Canli sohbet --- */
+  .sohbet{font-family:'JetBrains Mono',monospace;font-size:13px;height:56vh;min-height:320px;overflow-y:auto;
+    border:1px solid var(--cizgi);border-radius:4px;background:#080b09;padding:6px}
+  .msj{display:flex;gap:8px;align-items:baseline;padding:5px 8px;border-radius:3px}
+  .msj:hover{background:#11150f}
+  .msj .zm{color:#586154;font-size:10px;flex:0 0 42px}
+  .msj .ku{font-weight:700;flex:0 0 auto}
+  .msj .ic{flex:1;word-break:break-word;color:var(--metin)}
+  .msj.silinmis .ic{text-decoration:line-through;color:#5c6558}
+  .msj .ihl{color:var(--kirmizi);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  .msj .ar{flex:0 0 auto;display:none;gap:4px}
+  .msj:hover .ar{display:flex}
+  .msj .ar button{background:#161b13;border:1px solid var(--cizgi2);color:var(--soluk);border-radius:2px;
+    padding:2px 6px;font-size:10px;cursor:pointer;font-family:'JetBrains Mono',monospace}
+  .msj .ar button:hover{border-color:var(--kirmizi);color:var(--kirmizi)}
+  .rz{font-size:9px;padding:1px 4px;border-radius:2px;background:var(--cizgi2);color:var(--soluk);margin-right:3px}
+  .rz.mod{background:#123a12;color:var(--yesil)} .rz.yay{background:#3a1212;color:var(--kirmizi)}
+  .rz.abo{background:#123a3a;color:var(--mavi)}
+  .oyunkutu{border:1px solid var(--yesil);background:#0f1a08;border-radius:4px;padding:14px;margin-bottom:16px}
+  .oyunkutu .sr{font-family:'JetBrains Mono',monospace;color:var(--yesil);font-size:12px}
+  .bar{height:6px;background:var(--cizgi);border-radius:3px;overflow:hidden;margin-top:5px}
+  .bar div{height:100%;background:var(--yesil)}
+
   #tost{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--yesil);color:var(--metin);
     padding:11px 16px;border-radius:3px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:60;max-width:340px}
   #tost.gor{opacity:1;transform:none}
@@ -146,6 +169,8 @@
     </div>
     <nav id="menu">
       <button class="aktif" data-s="durum">Durum</button>
+      <button data-s="sohbet">Canlı sohbet</button>
+      <button data-s="oyunlar">Oyunlar <span class="rozet" id="rzOyun">—</span></button>
       <button data-s="cekilis">Çekiliş <span class="rozet" id="rzCekilis">—</span></button>
       <button data-s="komutlar">Komutlar <span class="rozet" id="rzKomut">0</span></button>
       <button data-s="kelimeler">Yasaklı kelimeler <span class="rozet" id="rzKelime">0</span></button>
@@ -202,6 +227,58 @@
         <p class="ipucu" style="color:var(--soluk);font-size:12px;margin-top:10px">
           Kullanıcının bu yayında en az bir kez yazmış olması gerekiyor — Kick, kullanıcı adından kimlik vermiyor.
         </p>
+      </div>
+    </section>
+
+    <!-- ============ CANLI SOHBET ============ -->
+    <section data-bolum="sohbet" class="gizli">
+      <h2>Canlı sohbet</h2>
+      <p class="altbaslik">Mesajın üstüne gel, sağdaki butonlarla anında işlem yap.</p>
+      <div class="sohbet" id="sohbetAkis"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+        <input id="sohbetYaz" placeholder="Sohbete yaz…" maxlength="480" style="flex:1">
+        <button class="btn" onclick="sohbettenYaz()">Gönder</button>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--soluk);font-size:12px;margin:0;white-space:nowrap">
+          <input type="checkbox" id="otoKaydir" checked style="width:auto"> Otomatik kaydır
+        </label>
+      </div>
+    </section>
+
+    <!-- ============ OYUNLAR ============ -->
+    <section data-bolum="oyunlar" class="gizli">
+      <h2>Oyunlar</h2>
+      <p class="altbaslik">Sohbeti hareketlendiren mini oyunlar. Kazanan puan alır.</p>
+
+      <div class="oyunkutu gizli" id="aktifOyun"></div>
+      <div class="oyunkutu gizli" id="aktifAnket"></div>
+
+      <div class="kart">
+        <h3>Oyun başlat</h3>
+        <div class="satir">
+          <button class="btn" onclick="oyunBaslat('kelime')">🔤 Karışık kelime</button>
+          <button class="btn" onclick="oyunBaslat('quiz')">🧠 Bilgi yarışması</button>
+          <button class="btn" onclick="oyunBaslat('sayi')">🔢 Sayı tahmini</button>
+          <button class="btn" onclick="oyunBaslat('hizli')">⚡ Hızlı yazma</button>
+          <button class="btn" onclick="oyunBaslat('matematik')">➗ Matematik</button>
+          <button class="ikincil btn" onclick="oyunBaslat('rastgele')">🎲 Rastgele</button>
+        </div>
+      </div>
+
+      <div class="kart">
+        <h3>Anket başlat</h3>
+        <div class="alan"><label>Soru</label><input id="anSoru" placeholder="Bugün ne oynayalım?"></div>
+        <div class="alan">
+          <label>Seçenekler (her satır bir seçenek, en fazla 5)</label>
+          <textarea id="anSecenek" placeholder="Valorant&#10;CS2&#10;Minecraft"></textarea>
+        </div>
+        <button class="btn" onclick="anketBaslat()">Anketi başlat</button>
+        <p style="color:var(--soluk);font-size:12px;margin-top:10px">İzleyiciler sohbete sadece <b>1</b>, <b>2</b>, <b>3</b> yazarak oy verir.</p>
+      </div>
+
+      <div class="kart">
+        <h3>Oyun ayarları</h3>
+        <div id="oyunAyar"></div>
+        <button class="btn" style="margin-top:12px" onclick="oyunAyarKaydet()">Kaydet</button>
       </div>
     </section>
 
@@ -475,6 +552,7 @@ async function yenile() {
     document.getElementById("rzKelime").textContent = d.sayilar.yasakli;
     document.getElementById("rzCeza").textContent = d.sayilar.cezali;
     document.getElementById("rzCekilis").textContent = d.cekilis.aktif ? "açık" : "—";
+    document.getElementById("rzOyun").textContent = d.oyun ? d.oyun.kalanSaniye + "s" : d.anket ? "anket" : "—";
   } catch (e) {
     if (String(e.message).includes("Şifre")) {
       sessionStorage.removeItem("panelKey");
@@ -483,8 +561,189 @@ async function yenile() {
   }
 
   const aktif = document.querySelector("#menu button.aktif")?.dataset.s;
-  const yukleyici = { cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
+  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
   if (yukleyici) yukleyici().catch((e) => tost(e.message, true));
+
+  // Canli sohbet ve oyun ekrani daha sik yenilenir
+  clearInterval(sohbetTimer);
+  if (aktif === "sohbet") sohbetTimer = setInterval(() => sohbetYukle().catch(() => {}), 2500);
+  if (aktif === "oyunlar") sohbetTimer = setInterval(() => oyunYukle().catch(() => {}), 3000);
+}
+
+// ---------- Canli sohbet ----------
+let sonNo = 0;
+let sohbetTimer = null;
+
+function rozetHtml(rozetler) {
+  const m = { broadcaster: ["yay", "YAYINCI"], moderator: ["mod", "MOD"], subscriber: ["abo", "ABONE"], vip: ["", "VIP"], og: ["", "OG"], founder: ["", "KURUCU"] };
+  return (rozetler || [])
+    .filter((r) => m[r])
+    .map((r) => '<span class="rz ' + m[r][0] + '">' + m[r][1] + "</span>")
+    .join("");
+}
+
+function msjHtml(m) {
+  const t = new Date(m.zaman);
+  const saat = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+  const renk = m.renk || "var(--metin)";
+  return (
+    '<div class="msj' + (m.silindi ? " silinmis" : "") + '" data-id="' + kacir(m.id) + '">' +
+    '<span class="zm">' + saat + "</span>" +
+    '<span class="ku" style="color:' + kacir(renk) + '">' + rozetHtml(m.rozetler) + kacir(m.kullanici) + "</span>" +
+    '<span class="ic">' + kacir(m.icerik) + (m.ihlal ? ' <span class="ihl">' + kacir(m.ihlal) + "</span>" : "") + "</span>" +
+    '<span class="ar">' +
+    (m.silindi ? "" : '<button onclick="msjSil(\'' + kacir(m.id) + '\')">sil</button>') +
+    '<button onclick="hizliCeza(\'' + kacir(m.kullanici) + '\',5)">5dk</button>' +
+    '<button onclick="hizliCeza(\'' + kacir(m.kullanici) + '\',60)">1sa</button>' +
+    '<button onclick="hizliCeza(\'' + kacir(m.kullanici) + '\',null)">ban</button>' +
+    "</span></div>"
+  );
+}
+
+async function sohbetYukle() {
+  const akis = document.getElementById("sohbetAkis");
+  const dipte = akis.scrollHeight - akis.scrollTop - akis.clientHeight < 60;
+
+  const v = await iste("/api/sohbet" + (sonNo ? "?sonNo=" + sonNo : ""));
+  if (sonNo === 0) akis.innerHTML = "";
+  sonNo = v.sonNo;
+
+  if (v.mesajlar.length) {
+    akis.insertAdjacentHTML("beforeend", v.mesajlar.map(msjHtml).join(""));
+    while (akis.children.length > 250) akis.removeChild(akis.firstChild);
+    if (dipte && document.getElementById("otoKaydir").checked) akis.scrollTop = akis.scrollHeight;
+  }
+  if (!akis.children.length) akis.innerHTML = '<div class="bos">Henüz mesaj yok. Sohbete bir şey yazılınca burada görünür.</div>';
+}
+
+async function msjSil(id) {
+  try {
+    await iste("/api/sohbet/sil", { method: "POST", body: JSON.stringify({ id }) });
+    const el = document.querySelector('.msj[data-id="' + id + '"]');
+    if (el) el.classList.add("silinmis");
+    tost("Mesaj silindi.");
+  } catch (e) { tost(e.message, true); }
+}
+
+async function hizliCeza(kullanici, dakika) {
+  if (dakika === null && !confirm(kullanici + " kalıcı olarak banlansın mı?")) return;
+  try {
+    await iste("/api/ceza", { method: "POST", body: JSON.stringify({ kullanici, dakika, sebep: "Panelden" }) });
+    tost(dakika ? kullanici + " " + dakika + " dk susturuldu." : kullanici + " banlandı.");
+  } catch (e) { tost(e.message, true); }
+}
+
+async function sohbettenYaz() {
+  const g = document.getElementById("sohbetYaz");
+  if (!g.value.trim()) return;
+  try {
+    await iste("/api/mesaj", { method: "POST", body: JSON.stringify({ metin: g.value }) });
+    g.value = "";
+  } catch (e) { tost(e.message, true); }
+}
+document.getElementById("sohbetYaz").addEventListener("keydown", (e) => e.key === "Enter" && sohbettenYaz());
+
+// ---------- Oyunlar ----------
+async function oyunYukle() {
+  const v = await iste("/api/oyun");
+  const ao = document.getElementById("aktifOyun");
+  const aa = document.getElementById("aktifAnket");
+
+  if (v.oyun) {
+    ao.classList.remove("gizli");
+    ao.innerHTML =
+      '<div class="sr">' + (v.tipler[v.oyun.tip] || v.oyun.tip).toUpperCase() + " — " + v.oyun.kalanSaniye + " sn kaldı</div>" +
+      '<div style="font-size:17px;margin:8px 0"><b>' + kacir(v.oyun.gorunen) + "</b></div>" +
+      '<div style="color:var(--soluk);font-size:12px">Cevap: <b style="color:var(--amber)">' + kacir(v.oyun.cevap) + "</b> · Ödül: " + v.oyun.odul + " puan</div>" +
+      '<div style="margin-top:12px"><button class="tehlike btn mini" onclick="oyunBitir()">Oyunu bitir</button></div>';
+  } else {
+    ao.classList.add("gizli");
+  }
+
+  if (v.anket) {
+    aa.classList.remove("gizli");
+    const enFazla = Math.max(1, ...v.anket.sayim);
+    aa.innerHTML =
+      '<div class="sr">ANKET — ' + v.anket.kalanSaniye + " sn kaldı · " + v.anket.toplam + " oy</div>" +
+      '<div style="font-size:16px;margin:8px 0"><b>' + kacir(v.anket.soru) + "</b></div>" +
+      v.anket.secenekler
+        .map(
+          (sc, i) =>
+            '<div style="margin:7px 0"><div style="display:flex;justify-content:space-between;font-size:13px">' +
+            "<span>" + (i + 1) + ") " + kacir(sc) + "</span><span class='mono'>" + v.anket.sayim[i] + "</span></div>" +
+            '<div class="bar"><div style="width:' + Math.round((v.anket.sayim[i] / enFazla) * 100) + '%"></div></div></div>'
+        )
+        .join("") +
+      '<div style="margin-top:12px"><button class="tehlike btn mini" onclick="anketBitir()">Anketi bitir</button></div>';
+  } else {
+    aa.classList.add("gizli");
+  }
+
+  // Ayarlar
+  if (!AYAR) AYAR = await iste("/api/ayarlar");
+  const o = AYAR.oyunlar;
+  document.getElementById("oyunAyar").innerHTML =
+    '<div class="anahtar"><div><div class="ad">Oyunlar açık</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-oy="oyunlar.aktif"' + (o.aktif ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="anahtar"><div><div class="ad">Otomatik oyun</div><div class="ipucu">Bot kendiliğinden rastgele oyun başlatsın</div></div>' +
+    '<label class="kaydir"><input type="checkbox" data-oy="oyunlar.otomatik.aktif"' + (o.otomatik.aktif ? " checked" : "") + "><span></span></label></div>" +
+    '<div class="satir" style="margin-top:14px">' +
+    '<div class="alan"><label>Otomatik oyun aralığı (dk)</label><input type="number" data-oy="oyunlar.otomatik.dakika" value="' + o.otomatik.dakika + '"></div>' +
+    '<div class="alan"><label>Oyun süresi (sn)</label><input type="number" data-oy="oyunlar.sure_saniye" value="' + o.sure_saniye + '"></div>' +
+    '<div class="alan"><label>Anket süresi (sn)</label><input type="number" data-oy="anket.sure_saniye" value="' + AYAR.anket.sure_saniye + '"></div>' +
+    "</div>" +
+    '<div class="satir">' +
+    Object.keys(o.oduller).map((t) => '<div class="alan"><label>Ödül: ' + t + '</label><input type="number" data-oy="oyunlar.oduller.' + t + '" value="' + o.oduller[t] + '"></div>').join("") +
+    "</div>" +
+    '<div class="alan"><label>Kelime havuzu (virgülle ayır)</label><textarea data-oy="oyunlar.kelime_havuzu" data-tip="virgul">' + kacir(o.kelime_havuzu.join(", ")) + "</textarea></div>" +
+    '<div class="alan"><label>Quiz soruları (her satır: <code>Soru?|Cevap</code>)</label><textarea data-oy="oyunlar.quiz_sorulari" data-tip="satirlar" style="min-height:130px">' + kacir(o.quiz_sorulari.join("\n")) + "</textarea></div>";
+}
+
+async function oyunBaslat(tip) {
+  try {
+    await iste("/api/oyun", { method: "POST", body: JSON.stringify({ islem: "basla", tip }) });
+    tost("Oyun başladı.");
+    oyunYukle();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function oyunBitir() {
+  await iste("/api/oyun", { method: "POST", body: JSON.stringify({ islem: "bitir" }) });
+  oyunYukle();
+}
+
+async function anketBaslat() {
+  const soru = document.getElementById("anSoru").value;
+  const secenekler = document.getElementById("anSecenek").value.split("\n").map((x) => x.trim()).filter(Boolean);
+  try {
+    await iste("/api/anket", { method: "POST", body: JSON.stringify({ islem: "basla", soru, secenekler }) });
+    tost("Anket başladı.");
+    document.getElementById("anSoru").value = "";
+    document.getElementById("anSecenek").value = "";
+    oyunYukle();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function anketBitir() {
+  await iste("/api/anket", { method: "POST", body: JSON.stringify({ islem: "bitir" }) });
+  oyunYukle();
+}
+
+async function oyunAyarKaydet() {
+  if (!AYAR) AYAR = await iste("/api/ayarlar");
+  document.querySelectorAll("[data-oy]").forEach((el) => {
+    let deger;
+    if (el.type === "checkbox") deger = el.checked;
+    else if (el.dataset.tip === "virgul") deger = el.value.split(",").map((x) => x.trim()).filter(Boolean);
+    else if (el.dataset.tip === "satirlar") deger = el.value.split("\n").map((x) => x.trim()).filter(Boolean);
+    else if (el.type === "number") deger = Number(el.value);
+    else deger = el.value;
+    yolaYaz(AYAR, el.dataset.oy, deger);
+  });
+  try {
+    await iste("/api/ayarlar", { method: "PUT", body: JSON.stringify(AYAR) });
+    tost("Oyun ayarları kaydedildi.");
+  } catch (e) { tost(e.message, true); }
 }
 
 // ---------- Kanal ----------

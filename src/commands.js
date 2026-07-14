@@ -2,6 +2,7 @@
 import * as kick from "./kickApi.js";
 import * as store from "./store.js";
 import { moderatorMu, cezaPuaniSifirla, cezaPuaniGetir } from "./moderation.js";
+import * as games from "./games.js";
 
 // Kullanici adi -> user_id (ban/timeout komutlari icin gerekli)
 export const kullaniciCache = new Map();
@@ -41,6 +42,15 @@ export function puanEkle(username, config) {
   store.kaydet();
 }
 
+// Oyun odulu gibi durumlarda cooldown'a takilmadan dogrudan puan verir
+export function puanVer(username, miktar) {
+  const db = store.get();
+  const kul = username.toLowerCase();
+  db.puanlar[kul] = (db.puanlar[kul] || 0) + Number(miktar || 0);
+  store.kaydet();
+  return db.puanlar[kul];
+}
+
 // ---------- Komut isleme ----------
 
 export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId, messageId, config }) {
@@ -77,9 +87,27 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
     const sabit = [prefix + "puan", prefix + "top"];
     let cevap = `Komutlar: ${[...sabit, ...ozel].join(" | ")}`;
     if (moderatorMu(sender, broadcaster)) {
-      cevap += ` || MOD: ${prefix}to ${prefix}ban ${prefix}unban ${prefix}af ${prefix}ceza ${prefix}duyuru ${prefix}yasakekle ${prefix}yasakcikar ${prefix}yasaklilar ${prefix}cekilis`;
+      cevap += ` || MOD: ${prefix}to ${prefix}ban ${prefix}unban ${prefix}af ${prefix}ceza ${prefix}duyuru ${prefix}yasakekle ${prefix}yasakcikar ${prefix}yasaklilar ${prefix}cekilis ${prefix}oyun ${prefix}anket`;
     }
     await yaz(cevap.slice(0, 490));
+    return true;
+  }
+
+  if (["oyunlar", "aktifoyun", "ipucu"].includes(komut)) {
+    const d = games.oyunDurumu();
+    if (!d) {
+      const a = games.anketDurumu();
+      await yaz(a ? `📊 Anket açık: ${a.soru} — Oy vermek için numarayı yaz. (${a.kalanSaniye} sn)` : "Şu an aktif oyun yok.");
+      return true;
+    }
+    const metin = {
+      kelime: `🔤 Karışık kelime: "${d.gorunen}"`,
+      quiz: `🧠 Soru: ${d.gorunen}`,
+      sayi: `🔢 ${d.gorunen}`,
+      hizli: `⚡ Yaz: "${d.gorunen}"`,
+      matematik: `➗ ${d.gorunen} = ?`,
+    }[d.tip];
+    await yaz(`${metin} — ${d.odul} puan, ${d.kalanSaniye} saniye kaldı.`);
     return true;
   }
 
@@ -154,6 +182,49 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
     } catch (e) {
       await yaz(`Ban kaldırılamadı: ${e.message.slice(0, 100)}`);
     }
+    return true;
+  }
+
+  // !oyun <tip> | !oyun bitir
+  if (["oyun", "etkinlik"].includes(komut)) {
+    const alt = (arg[0] || "rastgele").toLocaleLowerCase("tr-TR");
+
+    if (["bitir", "iptal", "dur"].includes(alt)) {
+      const m = games.oyunBitir();
+      await yaz(m || "Devam eden oyun yok.");
+      return true;
+    }
+
+    const eslesme = { kelime: "kelime", karisik: "kelime", quiz: "quiz", soru: "quiz", sayi: "sayi", sayı: "sayi", hizli: "hizli", hızlı: "hizli", matematik: "matematik", islem: "matematik", rastgele: "rastgele" };
+    const tip = eslesme[alt];
+    if (!tip) {
+      await yaz(`Oyun türleri: kelime, quiz, sayi, hizli, matematik, rastgele — Örnek: ${prefix}oyun kelime`);
+      return true;
+    }
+
+    const r = games.oyunBaslat(tip, config);
+    await yaz(r.ok ? r.duyuru : r.hata);
+    return true;
+  }
+
+  // !anket Soru? | secenek1 | secenek2
+  if (["anket", "oylama"].includes(komut)) {
+    if (!config.anket?.aktif) return true;
+    const ham = arg.join(" ");
+
+    if (["bitir", "sonuc", "sonuç"].includes((arg[0] || "").toLocaleLowerCase("tr-TR"))) {
+      const m = games.anketBitir();
+      await yaz(m || "Devam eden anket yok.");
+      return true;
+    }
+
+    const parca = ham.split("|").map((s) => s.trim()).filter(Boolean);
+    if (parca.length < 3) {
+      await yaz(`Kullanım: ${prefix}anket Soru? | seçenek 1 | seçenek 2`);
+      return true;
+    }
+    const r = games.anketBaslat(parca[0], parca.slice(1), config);
+    await yaz(r.ok ? r.duyuru : r.hata);
     return true;
   }
 

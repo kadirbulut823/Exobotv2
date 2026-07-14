@@ -7,6 +7,8 @@ import * as store from "./store.js";
 import * as ayar from "./config.js";
 import * as mod from "./moderation.js";
 import * as cmd from "./commands.js";
+import * as games from "./games.js";
+import * as chatlog from "./chatlog.js";
 import { panelRouter } from "./panel.js";
 
 store.yukle();
@@ -60,9 +62,18 @@ app.post("/webhook", express.raw({ type: "*/*" }), async (req, res) => {
 
 // ---------------- Panel ----------------
 
+// Panelden tetiklenen islemler sohbete duyuru yazabilsin diye
+async function duyur(metin) {
+  const config = ayar.get();
+  if (!config.bot.sohbete_yazsin) return;
+  const k = await kanalHazirla();
+  await kick.mesajGonder(k.broadcaster_user_id, metin, config.bot.mesaj_tipi);
+}
+
 app.use(
   panelRouter({
     kanalHazirla,
+    duyur,
     yayinDurumu: () => yayinAcik,
     // Panelden kanal adi degistirilirse onbellegi sifirla, yeniden cozulsun
     kanalSifirla: () => {
@@ -135,17 +146,36 @@ async function sohbetMesaji(olay) {
 
   cmd.kullaniciKaydet(sender);
 
+  // 0) Panelde canli izlenebilmesi icin tampona at
+  chatlog.ekle({ messageId, sender, icerik, rozetler: mod.rozetleri(sender) });
+
   // 1) Komutlar
   const komutMuydu = await cmd.komutIsle({ icerik, sender, broadcaster, broadcasterUserId, messageId, config });
   if (komutMuydu) return;
 
-  // 2) Puan
-  cmd.puanEkle(sender.username, config);
+  // 2) Moderasyon (oyun cevabi olsa bile kufurse ceza alir)
+  if (!mod.yetkiliMi(sender, broadcaster, config)) {
+    const ihlal = mod.filtreleriCalistir(icerik, sender, config);
+    if (ihlal) {
+      chatlog.silindiIsaretle(messageId, ihlal.sebep);
+      await mod.cezalandir({ ihlal, sender, messageId, broadcasterUserId, config });
+      return; // ihlalli mesaj oyuna sayilmaz
+    }
+  }
 
-  // 3) Moderasyon
-  if (mod.yetkiliMi(sender, broadcaster, config)) return;
-  const ihlal = mod.filtreleriCalistir(icerik, sender, config);
-  if (ihlal) await mod.cezalandir({ ihlal, sender, messageId, broadcasterUserId, config });
+  // 3) Oyun cevabi mi?
+  const kazanan = games.oyunKontrol(icerik, sender);
+  if (kazanan) {
+    cmd.puanVer(kazanan.kullanici, kazanan.odul);
+    await duyur(kazanan.duyuru).catch((e) => console.error("[oyun]", e.message));
+    return;
+  }
+
+  // 4) Anket oyu mu?
+  if (games.anketOy(icerik, sender)) return;
+
+  // 5) Sohbet puani
+  cmd.puanEkle(sender.username, config);
 }
 
 async function yeniTakipci(olay) {
@@ -198,6 +228,46 @@ setInterval(async () => {
     console.error("[oto]", e.message);
   }
 }, 60000);
+
+// ---------------- Oyun / anket zaman kontrolu ----------------
+
+setInterval(async () => {
+  try {
+    const bitti = games.oyunSureKontrol();
+    if (bitti) await duyur(bitti);
+
+    const anketBitti = games.anketSureKontrol();
+    if (anketBitti) await duyur(anketBitti);
+  } catch (e) {
+    console.error("[oyun]", e.message);
+  }
+}, 5000);
+
+// ---------------- Otomatik oyun ----------------
+
+let sonOyun = Date.now();
+
+setInterval(async () => {
+  try {
+    const config = ayar.get();
+    const o = config.oyunlar?.otomatik;
+    if (!o?.aktif || !config.oyunlar?.aktif || !kick.girisYapildiMi()) return;
+    if (o.sadece_yayin_acikken && !yayinAcik) return;
+    if (games.oyunDurumu()) return; // zaten oyun var
+
+    const aralik = Math.max(2, o.dakika || 30) * 60000;
+    if (Date.now() - sonOyun < aralik) return;
+    sonOyun = Date.now();
+
+    const r = games.oyunBaslat("rastgele", config);
+    if (r.ok) {
+      await duyur(r.duyuru);
+      console.log("[oyun] Otomatik oyun basladi:", r.tip);
+    }
+  } catch (e) {
+    console.error("[oyun]", e.message);
+  }
+}, 30000);
 
 // ---------------- Baslat ----------------
 

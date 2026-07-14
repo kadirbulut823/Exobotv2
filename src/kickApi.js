@@ -211,6 +211,24 @@ export async function abonelikleriListele() {
   return api("GET", "/public/v1/events/subscriptions");
 }
 
+export async function abonelikleriSil(idler) {
+  if (!idler?.length) return {};
+  const q = idler.map((i) => `id=${encodeURIComponent(i)}`).join("&");
+  return api("DELETE", `/public/v1/events/subscriptions?${q}`);
+}
+
+// Kanal degistirilirken: eski abonelikleri sil, yeni kanala abone ol
+export async function abonelikleriYenile(broadcasterUserId) {
+  try {
+    const mevcut = await abonelikleriListele();
+    const idler = (mevcut?.data || []).map((s) => s.id).filter(Boolean);
+    if (idler.length) await abonelikleriSil(idler);
+  } catch (e) {
+    console.warn("[kick] Eski abonelikler silinemedi:", e.message);
+  }
+  return olaylaraAbone(broadcasterUserId);
+}
+
 // ---------- Webhook imza dogrulama ----------
 
 const KICK_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----

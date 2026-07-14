@@ -709,7 +709,8 @@ async function oyunYukle() {
     '<div class="satir">' +
     Object.keys(o.oduller).map((t) => '<div class="alan"><label>Ödül: ' + t + '</label><input type="number" data-oy="oyunlar.oduller.' + t + '" value="' + o.oduller[t] + '"></div>').join("") +
     "</div>" +
-    '<div class="alan"><label>Karışık kelime havuzu — <b>her satıra bir kelime</b> (' + o.kelime_havuzu.length + ' kelime)</label>' +
+    '<div class="alan"><label>Karışık kelime havuzu — her satıra bir kelime. Anlamını da yazmak için: <code>kelime|anlamı</code> (' + o.kelime_havuzu.length + ' kelime)</label>' +
+    '<p style="color:var(--soluk);font-size:11.5px;margin:-2px 0 6px">Anlam yazarsan, kelime bilindiğinde bot sohbete anlamını da yazar. Zor kelimeler için birebir.</p>' +
     '<textarea data-oy="oyunlar.kelime_havuzu" data-tip="satirlar" style="min-height:160px">' + kacir(o.kelime_havuzu.join("\n")) + "</textarea></div>" +
     '<div class="alan"><label>Hızlı yazma kelimeleri — <b>her satıra bir kelime</b></label>' +
     '<textarea data-oy="oyunlar.hizli_kelimeler" data-tip="satirlar" style="min-height:100px">' + kacir((o.hizli_kelimeler || []).join("\n")) + "</textarea></div>" +

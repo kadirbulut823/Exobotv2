@@ -162,7 +162,20 @@
       <h2>Durum</h2>
       <p class="altbaslik">Botun şu anki hâli ve hızlı işlemler.</p>
 
+      <div class="kart" id="kanalKart">
+        <h3>Bağlı kanal</h3>
+        <div class="satir">
+          <input id="kanalSlug" placeholder="kanaladi" autocapitalize="off" spellcheck="false">
+          <button class="btn" onclick="kanalBagla()">Bu kanala bağlan</button>
+        </div>
+        <p style="color:var(--soluk);font-size:12px;margin-top:10px">
+          Bot hesabının bu kanalda <b>moderatör</b> olması gerekiyor. Bağlandığında sohbet aboneliği otomatik yenilenir.
+        </p>
+        <div id="kanalUyari" class="uyari gizli" style="margin-top:12px"></div>
+      </div>
+
       <div class="serit">
+        <div><div class="etiket">Kanal</div><div class="deger mono" id="dKanal" style="font-size:15px">—</div></div>
         <div><div class="etiket">Bot</div><div class="deger" id="dGiris">—</div></div>
         <div><div class="etiket">Yayın</div><div class="deger" id="dYayin">—</div></div>
         <div><div class="etiket">Çekiliş</div><div class="deger" id="dCekilis">—</div></div>
@@ -438,6 +451,17 @@ async function yenile() {
   try {
     const d = await iste("/api/durum");
     document.getElementById("markaKanal").textContent = d.kanal || "—";
+    document.getElementById("dKanal").textContent = d.kanalId ? d.kanal : "ayarlanmadı";
+    const ks = document.getElementById("kanalSlug");
+    if (document.activeElement !== ks && !ks.value) ks.value = d.kanal || "";
+    // Kanal cozulememisse kullaniciyi uyar
+    if (!d.kanalId && d.giris) {
+      const u = document.getElementById("kanalUyari");
+      if (u.classList.contains("gizli")) {
+        u.classList.remove("gizli");
+        u.textContent = "Bot henüz bir kanala bağlı değil. Yukarıya kanal adını yazıp bağlan.";
+      }
+    }
     document.getElementById("dGiris").innerHTML = d.giris
       ? '<span class="nokta yesilnokta"></span>Bağlı'
       : '<span class="nokta kirminokta"></span>Bağlı değil';
@@ -461,6 +485,30 @@ async function yenile() {
   const aktif = document.querySelector("#menu button.aktif")?.dataset.s;
   const yukleyici = { cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
   if (yukleyici) yukleyici().catch((e) => tost(e.message, true));
+}
+
+// ---------- Kanal ----------
+async function kanalBagla() {
+  const slug = document.getElementById("kanalSlug").value.trim();
+  if (!slug) return tost("Kanal adı gerekli.", true);
+
+  const u = document.getElementById("kanalUyari");
+  u.classList.remove("gizli");
+  u.textContent = "Bağlanıyor…";
+
+  try {
+    const r = await iste("/api/kanal", { method: "POST", body: JSON.stringify({ slug }) });
+    if (r.abonelik === "OK") {
+      u.textContent = "✅ " + r.slug + " kanalına bağlanıldı (id: " + r.kanalId + "). Sohbet dinleniyor.";
+    } else {
+      u.textContent = "⚠ Kanal ayarlandı ama sohbet aboneliği kurulamadı: " + r.abonelik;
+    }
+    tost(r.slug + " kanalına bağlanıldı.");
+    yenile();
+  } catch (e) {
+    u.textContent = "❌ " + e.message;
+    tost(e.message, true);
+  }
 }
 
 // ---------- Durum islemleri ----------

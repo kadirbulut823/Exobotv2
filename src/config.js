@@ -22,6 +22,7 @@ const GOMULU = {
   oyunlar: {
     aktif: true,
     sure_saniye: 120,
+    flood_carpani: 3, // oyun sirasinda flood esigi bu kadar gevser (izleyiciler ceza almasin)
     oduller: { kelime: 50, quiz: 50, sayi: 75, hizli: 30, matematik: 40 },
     otomatik: { aktif: false, dakika: 30, sadece_yayin_acikken: true },
     // Bicim: "kelime"  ya da  "kelime|anlami"
@@ -74,6 +75,38 @@ const GOMULU = {
     ]
   },
   anket: { aktif: true, sure_saniye: 60 },
+
+  // Komut spam korumasi
+  komut_bekleme: {
+    komut_saniye: 10,      // ayni komut en fazla 10 sn'de bir cevaplanir
+    kullanici_saniye: 20,  // bir kullanici en fazla 20 sn'de bir komut kullanabilir
+  },
+
+  // Panik butonu: raid/bot saldirisinda esikleri sertlestirir
+  siki_mod: {
+    link_agirligi: 3,
+    flood_max_mesaj: 3,
+  },
+
+  // Otomatik raid tespiti: kisa surede cok sayida FARKLI kullanicidan AYNI mesaj
+  raid_korumasi: {
+    aktif: true,
+    saniye: 15,
+    farkli_kullanici: 5,
+    ceza_agirligi: 5,      // dogrudan en agir cezaya gider
+    siki_mod_dakika: 10,   // tespit edilirse siki mod bu kadar sure acik kalir
+  },
+
+  // Puan dukkani
+  dukkan: {
+    aktif: true,
+    urunler: [
+      { kod: "sarki", ad: "Şarkı isteği", fiyat: 200, tip: "istek", not_zorunlu: true, aktif: true },
+      { kod: "bilet", ad: "Ekstra çekiliş bileti", fiyat: 150, tip: "bilet", max_adet: 5, aktif: true },
+      { kod: "duyuru", ad: "Sohbete duyuru", fiyat: 300, tip: "duyuru", not_zorunlu: true, aktif: true },
+      { kod: "vip", ad: "VIP talebi", fiyat: 1000, tip: "istek", not_zorunlu: false, aktif: true },
+    ],
+  },
 };
 
 // Varsayilan ayarlarda olup canli ayarlarda olmayan yeni alanlari ekler

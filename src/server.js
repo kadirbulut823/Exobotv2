@@ -9,6 +9,8 @@ import * as mod from "./moderation.js";
 import * as cmd from "./commands.js";
 import * as games from "./games.js";
 import * as chatlog from "./chatlog.js";
+import * as stats from "./stats.js";
+import * as queue from "./queue.js";
 import { panelRouter } from "./panel.js";
 
 store.yukle();
@@ -62,18 +64,24 @@ app.post("/webhook", express.raw({ type: "*/*" }), async (req, res) => {
 
 // ---------------- Panel ----------------
 
-// Panelden tetiklenen islemler sohbete duyuru yazabilsin diye
-async function duyur(metin) {
+// Sohbete yazma - HEPSI kuyruktan gecer (Kick mesaj limitine takilmamak icin)
+// oncelik: 2 = moderasyon, 1 = oyun/etkinlik, 0 = komut cevabi
+async function duyur(metin, oncelik = 1) {
   const config = ayar.get();
   if (!config.bot.sohbete_yazsin) return;
   const k = await kanalHazirla();
-  await kick.mesajGonder(k.broadcaster_user_id, metin, config.bot.mesaj_tipi);
+  return queue.kuyrugaAl(
+    (m) => kick.mesajGonder(k.broadcaster_user_id, m, config.bot.mesaj_tipi),
+    metin,
+    oncelik
+  );
 }
 
 app.use(
   panelRouter({
     kanalHazirla,
     duyur,
+    kuyrukDurumu: () => queue.durum(),
     yayinDurumu: () => yayinAcik,
     // Panelden kanal adi degistirilirse onbellegi sifirla, yeniden cozulsun
     kanalSifirla: () => {
@@ -146,19 +154,34 @@ async function sohbetMesaji(olay) {
 
   cmd.kullaniciKaydet(sender);
 
-  // 0) Panelde canli izlenebilmesi icin tampona at
+  // 0) Panelde canli izlenebilmesi icin tampona at + istatistik
   chatlog.ekle({ messageId, sender, icerik, rozetler: mod.rozetleri(sender) });
+  stats.mesajKaydet(sender, icerik);
 
   // 1) Komutlar
   const komutMuydu = await cmd.komutIsle({ icerik, sender, broadcaster, broadcasterUserId, messageId, config });
   if (komutMuydu) return;
 
   // 2) Moderasyon (oyun cevabi olsa bile kufurse ceza alir)
+  // Oyun/anket acikken flood esigi gevsetilir - yoksa hizli tahmin yapanlar ceza alir
+  const oyunAktif = Boolean(games.oyunDurumu() || games.anketDurumu());
+
   if (!mod.yetkiliMi(sender, broadcaster, config)) {
-    const ihlal = mod.filtreleriCalistir(icerik, sender, config);
+    const ihlal = mod.filtreleriCalistir(icerik, sender, config, oyunAktif);
     if (ihlal) {
       chatlog.silindiIsaretle(messageId, ihlal.sebep);
-      await mod.cezalandir({ ihlal, sender, messageId, broadcasterUserId, config });
+      stats.ihlalKaydet(sender, ihlal.sebep);
+
+      // Raid tespit edildiyse sohbete uyari dus
+      if (ihlal.raid) {
+        console.warn(`[raid] Saldiri tespit edildi: ${ihlal.raid.kisi} hesap ayni mesaji yazdi.`);
+        await duyur(
+          `🛡️ Saldırı tespit edildi (${ihlal.raid.kisi} hesap). SIKI MOD açıldı — link yasak, spam eşikleri sertleşti.`,
+          2
+        ).catch(() => {});
+      }
+
+      await mod.cezalandir({ ihlal, sender, messageId, broadcasterUserId, config, duyur });
       return; // ihlalli mesaj oyuna sayilmaz
     }
   }
@@ -167,7 +190,7 @@ async function sohbetMesaji(olay) {
   const kazanan = games.oyunKontrol(icerik, sender);
   if (kazanan) {
     cmd.puanVer(kazanan.kullanici, kazanan.odul);
-    await duyur(kazanan.duyuru).catch((e) => console.error("[oyun]", e.message));
+    await duyur(kazanan.duyuru, 1).catch((e) => console.error("[oyun]", e.message));
     return;
   }
 

@@ -3,6 +3,7 @@ import * as kick from "./kickApi.js";
 import * as store from "./store.js";
 import { moderatorMu, cezaPuaniSifirla, cezaPuaniGetir } from "./moderation.js";
 import * as games from "./games.js";
+import * as shop from "./shop.js";
 
 // Kullanici adi -> user_id (ban/timeout komutlari icin gerekli)
 export const kullaniciCache = new Map();
@@ -24,6 +25,27 @@ export function cekilisDurum() {
 
 export function cekilisKatilimciSayisi() {
   return Object.keys(cekilisDurum().katilimcilar || {}).length;
+}
+
+// Kazanani ceker. Dukkandan bilet alanlarin sansi bilet sayisi kadar artar.
+export function cekilisCek() {
+  const c = cekilisDurum();
+  const isimler = Object.keys(c.katilimcilar || {});
+  if (!isimler.length) return null;
+
+  // Her katilimci en az 1 bilet; dukkandan alinanlar eklenir
+  const kutu = [];
+  for (const kul of isimler) {
+    const bilet = Math.max(1, (c.biletler || {})[kul] || 1);
+    for (let i = 0; i < bilet; i++) kutu.push(kul);
+  }
+
+  const kazanan = kutu[Math.floor(Math.random() * kutu.length)];
+  c.kazanan = kazanan;
+  c.aktif = false;
+  store.kaydet();
+
+  return { kazanan, katilimci: isimler.length, bilet: kutu.length };
 }
 
 // ---------- Puan ----------
@@ -49,6 +71,27 @@ export function puanVer(username, miktar) {
   db.puanlar[kul] = (db.puanlar[kul] || 0) + Number(miktar || 0);
   store.kaydet();
   return db.puanlar[kul];
+}
+
+// ---------- Komut bekleme suresi (cooldown) ----------
+// Olmazsa biri !komutlar yazip durur, bot Kick'in mesaj limitine takilir
+// ve moderasyon uyarilari dahil HICBIR mesaji gonderemez hale gelir.
+const komutSonKullanim = new Map(); // "komut" -> zaman  (genel)
+const kullaniciSonKomut = new Map(); // "kullanici" -> zaman
+
+export function cooldownEngelli(komut, sender, config, modMu) {
+  if (modMu) return false; // modlar beklemez
+  const simdi = Date.now();
+
+  const genel = (config.komut_bekleme?.komut_saniye ?? 10) * 1000;
+  const kisisel = (config.komut_bekleme?.kullanici_saniye ?? 20) * 1000;
+
+  if (simdi - (komutSonKullanim.get(komut) || 0) < genel) return true;
+  if (simdi - (kullaniciSonKomut.get(sender.username.toLowerCase()) || 0) < kisisel) return true;
+
+  komutSonKullanim.set(komut, simdi);
+  kullaniciSonKomut.set(sender.username.toLowerCase(), simdi);
+  return false;
 }
 
 // ---------- Komut isleme ----------
@@ -79,6 +122,9 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
   const komut = (parcalar.shift() || "").toLocaleLowerCase("tr-TR");
   const arg = parcalar;
   const mod = moderatorMu(sender, broadcaster);
+
+  // Spam korumasi: cok sik komut kullanimini sessizce yok say
+  if (cooldownEngelli(komut, sender, config, mod)) return true;
 
   // ================= GENEL KOMUTLAR =================
 
@@ -115,6 +161,36 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
     if (!config.puan_sistemi?.aktif) return true;
     const p = store.get().puanlar[sender.username.toLowerCase()] || 0;
     await yaz(`@${sender.username} → ${p} ${config.puan_sistemi.isim}`);
+    return true;
+  }
+
+  // !dukkan
+  if (["dukkan", "dükkan", "market", "magaza"].includes(komut)) {
+    if (!config.dukkan?.aktif) return true;
+    await yaz(shop.dukkanMetni(config, prefix));
+    return true;
+  }
+
+  // !al <urun> [not]
+  if (["al", "satinal", "harca"].includes(komut)) {
+    if (!config.dukkan?.aktif) return true;
+    const kod = arg[0];
+    const not = arg.slice(1).join(" ");
+    if (!kod) {
+      await yaz(`Kullanım: ${prefix}al <ürün> — Ürünler için: ${prefix}dukkan`);
+      return true;
+    }
+
+    const r = shop.satinAl({
+      config,
+      sender,
+      kod,
+      not,
+      cekilis: cekilisDurum(),
+      puanDus: (kul, m) => puanVer(kul, -m),
+      puanEkle: (kul, m) => puanVer(kul, m),
+    });
+    await yaz(r.ok ? r.mesaj : r.hata);
     return true;
   }
 
@@ -351,15 +427,18 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
       c.aktif = true;
       c.anahtar = anahtar;
       c.katilimcilar = {};
+      c.biletler = {};
       c.kazanan = null;
       store.kaydet();
-      await yaz(`🎉 ÇEKİLİŞ BAŞLADI! Katılmak için sohbete "${anahtar}" yaz.`);
+      const biletUrun = (config.dukkan?.urunler || []).find((u) => u.tip === "bilet" && u.aktif !== false);
+      const ek = config.dukkan?.aktif && biletUrun ? ` Ekstra bilet için: ${prefix}al ${biletUrun.kod}` : "";
+      await yaz(`🎉 ÇEKİLİŞ BAŞLADI! Katılmak için sohbete "${anahtar}" yaz.${ek}`);
       return true;
     }
 
     if (["cek", "çek", "bitir", "sonuc", "sonuç", "kazanan"].includes(alt)) {
-      const isimler = Object.keys(c.katilimcilar || {});
-      if (isimler.length === 0) {
+      const r = cekilisCek();
+      if (!r) {
         await yaz(
           c.aktif
             ? `Henüz kimse katılmadı. Katılmak için: "${c.anahtar}"`
@@ -367,11 +446,8 @@ export async function komutIsle({ icerik, sender, broadcaster, broadcasterUserId
         );
         return true;
       }
-      const kazanan = isimler[Math.floor(Math.random() * isimler.length)];
-      c.kazanan = kazanan;
-      c.aktif = false;
-      store.kaydet();
-      await yaz(`🏆 KAZANAN: @${kazanan}! (${isimler.length} katılımcı arasından) Tebrikler!`);
+      const ek = r.bilet > r.katilimci ? ` [${r.bilet} bilet]` : "";
+      await yaz(`🏆 KAZANAN: @${r.kazanan}! (${r.katilimci} katılımcı${ek} arasından) Tebrikler!`);
       return true;
     }
 

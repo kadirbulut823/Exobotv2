@@ -6,6 +6,86 @@ import * as store from "./store.js";
 // Mesaj gecmisi (flood tespiti) ise gecicidir, kalici olmasina gerek yok.
 const mesajGecmisi = new Map(); // username -> [{ zaman, metin }]
 
+// ---------- Siki mod ----------
+// Panik butonu: raid/bot saldirisinda esikleri sertlestirir.
+let sikiMod = { aktif: false, bitis: 0, otomatik: false };
+
+export function sikiModDurumu() {
+  if (sikiMod.aktif && sikiMod.bitis && Date.now() > sikiMod.bitis) {
+    sikiMod = { aktif: false, bitis: 0, otomatik: false };
+  }
+  return {
+    aktif: sikiMod.aktif,
+    otomatik: sikiMod.otomatik,
+    kalanSaniye: sikiMod.bitis ? Math.max(0, Math.round((sikiMod.bitis - Date.now()) / 1000)) : 0,
+  };
+}
+
+export function sikiModAyarla(aktif, dakika = 0, otomatik = false) {
+  sikiMod = {
+    aktif: Boolean(aktif),
+    bitis: aktif && dakika ? Date.now() + dakika * 60000 : 0,
+    otomatik,
+  };
+  return sikiModDurumu();
+}
+
+// Siki modda esikleri sertlestirilmis bir kopya dondurur
+function esikler(config) {
+  const f = config.filtreler;
+  if (!sikiModDurumu().aktif) return f;
+
+  const s = config.siki_mod || {};
+  return {
+    ...f,
+    // Siki modda HICBIR link gecmez - izinli alan adlari bile
+    link: {
+      ...f.link,
+      aktif: true,
+      aboneler_link_atabilir: false,
+      izinli_alan_adlari: [],
+      ceza_agirligi: s.link_agirligi ?? 3,
+    },
+    flood: { ...f.flood, aktif: true, max_mesaj: s.flood_max_mesaj ?? 3, saniye: f.flood.saniye },
+    buyuk_harf: { ...f.buyuk_harf, aktif: true, max_oran: 0.5 },
+    emote_spam: { ...f.emote_spam, aktif: true, max_emote: 3 },
+    ayni_mesaj: { ...f.ayni_mesaj, aktif: true, max_tekrar: 1 },
+  };
+}
+
+// ---------- Raid / bot saldirisi tespiti ----------
+// Kisa surede cok sayida FARKLI kullanicidan AYNI mesaj gelirse saldiri sayilir.
+const sonMesajlar = []; // { kul, metin, zaman }
+
+function raidKontrol(kul, metin, config) {
+  const r = config.raid_korumasi;
+  if (!r?.aktif || sikiModDurumu().aktif) return null;
+
+  const simdi = Date.now();
+  const pencere = (r.saniye ?? 15) * 1000;
+
+  sonMesajlar.push({ kul, metin, zaman: simdi });
+  while (sonMesajlar.length && simdi - sonMesajlar[0].zaman > pencere) sonMesajlar.shift();
+
+  // Ayni metni yazan farkli kullanici sayisi
+  const sayim = {};
+  for (const m of sonMesajlar) {
+    if (!m.metin || m.metin.length < 3) continue;
+    if (!sayim[m.metin]) sayim[m.metin] = new Set();
+    sayim[m.metin].add(m.kul);
+  }
+
+  const esik = r.farkli_kullanici ?? 5;
+  for (const [metinX, kullanicilar] of Object.entries(sayim)) {
+    if (kullanicilar.size >= esik) {
+      sonMesajlar.length = 0;
+      sikiModAyarla(true, r.siki_mod_dakika ?? 10, true);
+      return { metin: metinX, kisi: kullanicilar.size };
+    }
+  }
+  return null;
+}
+
 function cezaKayitlari() {
   const db = store.get();
   if (!db.cezalar) db.cezalar = {};
@@ -124,11 +204,19 @@ function linkleriBul(metin) {
 // ---------- Filtreler ----------
 // Her filtre { sebep, agirlik } dondurur veya null
 
-export function filtreleriCalistir(icerik, sender, config) {
-  const f = config.filtreler;
+// oyunAktif: oyun/anket devam ediyorsa flood esigi gevsetilir,
+// yoksa hizli tahmin yapan izleyiciler ceza alir.
+export function filtreleriCalistir(icerik, sender, config, oyunAktif = false) {
+  const f = esikler(config);
   const temiz = emoteleriTemizle(icerik).trim();
   const kul = (sender.username || "").toLowerCase();
   const simdi = Date.now();
+
+  // Raid tespiti (kufur/link kontrolunden once, cunku bot ordulari genelde temiz metin yazar)
+  const raid = raidKontrol(kul, normalMetin(temiz), config);
+  if (raid) {
+    return { sebep: "Raid saldırısı", agirlik: config.raid_korumasi?.ceza_agirligi ?? 5, raid };
+  }
 
   // --- Sohbetten eklenen yasakli kelimeler (!yasakekle) ---
   // Kufur filtresi kapali olsa bile bunlar HER ZAMAN kontrol edilir.
@@ -205,10 +293,13 @@ export function filtreleriCalistir(icerik, sender, config) {
   gecmis.push({ zaman: simdi, metin: normalMetin(temiz) });
   mesajGecmisi.set(kul, gecmis);
 
+  // Oyun sirasinda herkes hizli hizli tahmin yazar; esikleri gevset
+  const carpan = oyunAktif ? Math.max(1, config.oyunlar?.flood_carpani ?? 3) : 1;
+
   if (f.flood?.aktif) {
     const pencere = (f.flood.saniye ?? 10) * 1000;
     const sayi = gecmis.filter((m) => simdi - m.zaman <= pencere).length;
-    if (sayi > (f.flood.max_mesaj ?? 5)) {
+    if (sayi > (f.flood.max_mesaj ?? 5) * carpan) {
       return { sebep: "Flood (çok hızlı mesaj)", agirlik: f.flood.ceza_agirligi ?? 1 };
     }
   }
@@ -218,7 +309,7 @@ export function filtreleriCalistir(icerik, sender, config) {
     const bu = normalMetin(temiz);
     if (bu.length > 2) {
       const ayni = gecmis.filter((m) => simdi - m.zaman <= pencere && m.metin === bu).length;
-      if (ayni > (f.ayni_mesaj.max_tekrar ?? 3)) {
+      if (ayni > (f.ayni_mesaj.max_tekrar ?? 3) * carpan) {
         return { sebep: "Aynı mesaj tekrarı", agirlik: f.ayni_mesaj.ceza_agirligi ?? 1 };
       }
     }
@@ -263,7 +354,7 @@ export function cezaPuaniSifirla(kul) {
   return vardi;
 }
 
-export async function cezalandir({ ihlal, sender, messageId, broadcasterUserId, config }) {
+export async function cezalandir({ ihlal, sender, messageId, broadcasterUserId, config, duyur }) {
   const kul = sender.username;
   const puan = cezaPuaniEkle(kul.toLowerCase(), ihlal.agirlik, config.cezalar.puan_sifirlama_dakika ?? 60);
 
@@ -293,14 +384,12 @@ export async function cezalandir({ ihlal, sender, messageId, broadcasterUserId, 
     aciklama = "ceza uygulanamadı (bot moderatör mü?)";
   }
 
-  // 2) Sohbete uyari yaz
+  // 2) Sohbete uyari yaz (kuyruktan, en yuksek oncelikle -> asla dusmez)
   if (config.bot.sohbete_yazsin && config.bot.uyari_mesajlari_acik) {
+    const metin = `@${kul} → ${ihlal.sebep}. ${aciklama}. (Ceza puanı: ${puan})`;
     try {
-      await kick.mesajGonder(
-        broadcasterUserId,
-        `@${kul} → ${ihlal.sebep}. ${aciklama}. (Ceza puanı: ${puan})`,
-        config.bot.mesaj_tipi
-      );
+      if (duyur) await duyur(metin, 2);
+      else await kick.mesajGonder(broadcasterUserId, metin, config.bot.mesaj_tipi);
     } catch (e) {
       console.error("[mod] Uyari mesaji gonderilemedi:", e.message);
     }

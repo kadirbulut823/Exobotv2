@@ -10,6 +10,8 @@ import * as mod from "./moderation.js";
 import * as cmd from "./commands.js";
 import * as games from "./games.js";
 import * as chatlog from "./chatlog.js";
+import * as shop from "./shop.js";
+import * as stats from "./stats.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -59,6 +61,8 @@ export function panelRouter(ctx) {
       cekilis: { aktif: ck.aktif, anahtar: ck.anahtar, katilimci: cmd.cekilisKatilimciSayisi(), kazanan: ck.kazanan },
       oyun: games.oyunDurumu(),
       anket: games.anketDurumu(),
+      sikiMod: mod.sikiModDurumu(),
+      bekleyenTalep: shop.talepListesi("bekliyor").length,
       sayilar: {
         islem: db.ban_gecmisi.length,
         cezali: Object.keys(db.cezalar || {}).length,
@@ -134,6 +138,84 @@ export function panelRouter(ctx) {
     }
     res.json({ ok: true });
   });
+
+  // ---------------- Siki mod (panik butonu) ----------------
+  r.get("/api/sikimod", kilit, (_req, res) => res.json(mod.sikiModDurumu()));
+
+  r.post("/api/sikimod", kilit, async (req, res) => {
+    const aktif = Boolean(req.body?.aktif);
+    const dakika = Number(req.body?.dakika || 0);
+    const d = mod.sikiModAyarla(aktif, dakika, false);
+    store.logEkle({
+      kullanici: "-",
+      sebep: aktif ? `Sıkı mod açıldı${dakika ? ` (${dakika} dk)` : ""}` : "Sıkı mod kapatıldı",
+      islem: "sikimod",
+      yetkili: "panel",
+    });
+    try {
+      await ctx.duyur(
+        aktif
+          ? "🛡️ SIKI MOD açıldı — link yasak, spam eşikleri sertleştirildi."
+          : "✅ Sıkı mod kapatıldı, sohbet normale döndü.",
+        2
+      );
+    } catch {}
+    res.json(d);
+  });
+
+  // ---------------- Dukkan ----------------
+  r.get("/api/dukkan", kilit, (_req, res) => {
+    res.json({
+      ayar: ayar.get().dukkan || { aktif: false, urunler: [] },
+      talepler: shop.talepListesi(),
+    });
+  });
+
+  r.post("/api/dukkan/talep", kilit, async (req, res) => {
+    const { id, karar } = req.body || {};
+    const r2 = shop.talepKarar(id, karar, (kul, m) => cmd.puanVer(kul, m));
+    if (!r2.ok) return res.status(400).json({ hata: r2.hata });
+
+    const t = r2.talep;
+    try {
+      if (karar === "onay") {
+        // Duyuru urunuyse kullanicinin notunu sohbete dus
+        if (t.tip === "duyuru" && t.not) {
+          await ctx.duyur(`📢 @${t.kullanici}: ${t.not}`, 1);
+        } else {
+          await ctx.duyur(`✅ @${t.kullanici} → ${t.urunAd} onaylandı!${t.not ? " " + t.not : ""}`, 1);
+        }
+      } else {
+        await ctx.duyur(`❌ @${t.kullanici} → ${t.urunAd} reddedildi. ${r2.iade} puan iade edildi.`, 1);
+      }
+    } catch {}
+
+    res.json({ ok: true, talep: t, iade: r2.iade });
+  });
+
+  r.delete("/api/dukkan/talep", kilit, (_req, res) => {
+    shop.talepTemizle();
+    res.json({ ok: true });
+  });
+
+  // ---------------- Istatistik ----------------
+  r.get("/api/istatistik", kilit, (_req, res) => {
+    res.json({ ...stats.ozet(), kuyruk: ctx.kuyrukDurumu?.() || null, sikiMod: mod.sikiModDurumu() });
+  });
+
+  r.delete("/api/istatistik", kilit, (_req, res) => {
+    stats.sifirla();
+    res.json({ ok: true });
+  });
+
+  // ---------------- Kullanici profili ----------------
+  r.get("/api/profil/:kullanici", kilit, (req, res) => {
+    const p = stats.profil(req.params.kullanici);
+    if (!p) return res.status(404).json({ hata: "Bu kullanıcı hiç mesaj yazmamış." });
+    res.json(p);
+  });
+
+  r.get("/api/kullanici-ara", kilit, (req, res) => res.json(stats.ara(req.query.q)));
 
   // ---------------- Kanal degistirme ----------------
   r.post("/api/kanal", kilit, async (req, res) => {
@@ -336,6 +418,7 @@ export function panelRouter(ctx) {
       anahtar: ck.anahtar,
       kazanan: ck.kazanan,
       katilimcilar: Object.keys(ck.katilimcilar || {}),
+      biletler: ck.biletler || {},
     });
   });
 
@@ -359,6 +442,7 @@ export function panelRouter(ctx) {
       ck.aktif = true;
       ck.anahtar = anahtar;
       ck.katilimcilar = {};
+      ck.biletler = {};
       ck.kazanan = null;
       store.kaydet();
       await duyur(`🎉 ÇEKİLİŞ BAŞLADI! Katılmak için sohbete "${anahtar}" yaz.`);
@@ -366,14 +450,11 @@ export function panelRouter(ctx) {
     }
 
     if (islem === "cek") {
-      const isimler = Object.keys(ck.katilimcilar || {});
-      if (!isimler.length) return res.status(400).json({ hata: "Katılımcı yok." });
-      const kazanan = isimler[Math.floor(Math.random() * isimler.length)];
-      ck.kazanan = kazanan;
-      ck.aktif = false;
-      store.kaydet();
-      await duyur(`🏆 KAZANAN: @${kazanan}! (${isimler.length} katılımcı arasından) Tebrikler!`);
-      return res.json({ ok: true, kazanan, katilimci: isimler.length });
+      const r3 = cmd.cekilisCek(); // bilet alanlarin sansi daha yuksek
+      if (!r3) return res.status(400).json({ hata: "Katılımcı yok." });
+      const ek = r3.bilet > r3.katilimci ? ` [${r3.bilet} bilet]` : "";
+      await duyur(`🏆 KAZANAN: @${r3.kazanan}! (${r3.katilimci} katılımcı${ek} arasından) Tebrikler!`);
+      return res.json({ ok: true, ...r3 });
     }
 
     if (islem === "iptal") {

@@ -131,6 +131,30 @@
   .bar{height:6px;background:var(--cizgi);border-radius:3px;overflow:hidden;margin-top:5px}
   .bar div{height:100%;background:var(--yesil)}
 
+  /* --- Panik butonu --- */
+  .panik{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--cizgi2);
+    border-radius:4px;padding:14px 16px;margin-bottom:16px;background:var(--panel)}
+  .panik.acik{border-color:var(--kirmizi);background:#1a0d0d}
+  .panik b{font-size:14px} .panik .ip{color:var(--soluk);font-size:12px;margin-top:2px}
+  /* --- Grafikler --- */
+  .cubuk{display:flex;align-items:flex-end;gap:3px;height:110px;margin-top:6px}
+  .cubuk .c{flex:1;background:var(--cizgi2);border-radius:2px 2px 0 0;min-height:2px;position:relative}
+  .cubuk .c.dolu{background:var(--yesil)}
+  .cubuk .c:hover:after{content:attr(data-v);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    background:#000;color:#fff;font-size:10px;padding:2px 5px;border-radius:2px;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+  .eksen{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--soluk);margin-top:4px}
+  .yatay{margin:9px 0}
+  .yatay .ust{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px}
+  /* --- Profil --- */
+  .profil{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:70;padding:20px}
+  .profil .ic{background:var(--panel);border:1px solid var(--cizgi2);border-radius:4px;padding:24px;max-width:560px;width:100%;max-height:85vh;overflow:auto}
+  .kutucuk{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:1px;background:var(--cizgi);border:1px solid var(--cizgi);margin:14px 0}
+  .kutucuk div{background:var(--panel);padding:10px 12px}
+  .kutucuk .e{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--soluk);letter-spacing:.1em}
+  .kutucuk .d{font-size:17px;font-weight:500;margin-top:3px}
+  .msj .ku{cursor:pointer}
+  .msj .ku:hover{text-decoration:underline}
+
   #tost{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--yesil);color:var(--metin);
     padding:11px 16px;border-radius:3px;font-size:13px;opacity:0;transform:translateY(8px);transition:.2s;pointer-events:none;z-index:60;max-width:340px}
   #tost.gor{opacity:1;transform:none}
@@ -171,6 +195,8 @@
       <button class="aktif" data-s="durum">Durum</button>
       <button data-s="sohbet">Canlı sohbet</button>
       <button data-s="oyunlar">Oyunlar <span class="rozet" id="rzOyun">—</span></button>
+      <button data-s="dukkan">Dükkân <span class="rozet" id="rzTalep">0</span></button>
+      <button data-s="istatistik">İstatistik</button>
       <button data-s="cekilis">Çekiliş <span class="rozet" id="rzCekilis">—</span></button>
       <button data-s="komutlar">Komutlar <span class="rozet" id="rzKomut">0</span></button>
       <button data-s="kelimeler">Yasaklı kelimeler <span class="rozet" id="rzKelime">0</span></button>
@@ -186,6 +212,14 @@
     <section data-bolum="durum">
       <h2>Durum</h2>
       <p class="altbaslik">Botun şu anki hâli ve hızlı işlemler.</p>
+
+      <div class="panik" id="panikKutu">
+        <div>
+          <b id="panikBaslik">🛡️ Sıkı mod: kapalı</b>
+          <div class="ip" id="panikIp">Raid/bot saldırısında aç: tüm linkler yasaklanır, spam eşikleri sertleşir.</div>
+        </div>
+        <button class="btn tehlike" id="panikBtn" onclick="panikBas()">Sıkı modu aç</button>
+      </div>
 
       <div class="kart" id="kanalKart">
         <h3>Bağlı kanal</h3>
@@ -279,6 +313,97 @@
         <h3>Oyun ayarları</h3>
         <div id="oyunAyar"></div>
         <button class="btn" style="margin-top:12px" onclick="oyunAyarKaydet()">Kaydet</button>
+      </div>
+    </section>
+
+    <!-- ============ DUKKAN ============ -->
+    <section data-bolum="dukkan" class="gizli">
+      <h2>Puan dükkânı</h2>
+      <p class="altbaslik">İzleyiciler <code>!dukkan</code> ile listeyi görür, <code>!al &lt;ürün&gt;</code> ile satın alır. Talepler buraya düşer.</p>
+
+      <div class="kart">
+        <h3>Bekleyen talepler</h3>
+        <table><tbody id="talepTablo"></tbody></table>
+        <div class="bos gizli" id="talepBos">Bekleyen talep yok.</div>
+      </div>
+
+      <div class="kart">
+        <h3>Ürünler</h3>
+        <table>
+          <thead><tr><th>Kod</th><th>Ürün</th><th>Fiyat</th><th>Tip</th><th>Durum</th><th></th></tr></thead>
+          <tbody id="urunTablo"></tbody>
+        </table>
+      </div>
+
+      <div class="kart">
+        <h3>Yeni ürün</h3>
+        <div class="satir">
+          <div class="alan"><label>Kod (<code>!al kod</code>)</label><input id="uKod" placeholder="sarki"></div>
+          <div class="alan"><label>Görünen ad</label><input id="uAd" placeholder="Şarkı isteği"></div>
+          <div class="alan"><label>Fiyat</label><input id="uFiyat" type="number" value="200"></div>
+        </div>
+        <div class="satir">
+          <div class="alan">
+            <label>Tip</label>
+            <select id="uTip">
+              <option value="istek">İstek (mod onayı)</option>
+              <option value="duyuru">Duyuru (notu sohbete yazar, mod onaylı)</option>
+              <option value="bilet">Çekiliş bileti (ekstra şans)</option>
+            </select>
+          </div>
+          <div class="alan">
+            <label>Not zorunlu mu?</label>
+            <select id="uNot"><option value="evet">Evet</option><option value="hayir">Hayır</option></select>
+          </div>
+          <div class="alan" style="display:flex;align-items:flex-end"><button class="btn" onclick="urunEkle()" style="width:100%">Ürünü ekle</button></div>
+        </div>
+      </div>
+
+      <div class="kart">
+        <h3>Geçmiş talepler</h3>
+        <div class="log" id="talepGecmis"></div>
+        <div style="margin-top:12px"><button class="tehlike btn mini" onclick="talepTemizle()">Sonuçlananları temizle</button></div>
+      </div>
+    </section>
+
+    <!-- ============ ISTATISTIK ============ -->
+    <section data-bolum="istatistik" class="gizli">
+      <h2>İstatistik</h2>
+      <p class="altbaslik">Filtre eşiklerini tahminle değil, veriyle ayarla.</p>
+
+      <div class="serit">
+        <div><div class="etiket">Toplam mesaj</div><div class="deger" id="iMesaj">—</div></div>
+        <div><div class="etiket">Toplam ihlal</div><div class="deger" id="iIhlal">—</div></div>
+        <div><div class="etiket">Farklı kişi</div><div class="deger" id="iKisi">—</div></div>
+        <div><div class="etiket">Mesaj kuyruğu</div><div class="deger" id="iKuyruk">—</div></div>
+      </div>
+
+      <div class="kart">
+        <h3>Hangi filtre kaç kez tetiklendi</h3>
+        <div id="iFiltre"></div>
+      </div>
+
+      <div class="kart">
+        <h3>Saatlik yoğunluk (mesaj sayısı)</h3>
+        <div class="cubuk" id="iSaatlik"></div>
+        <div class="eksen"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+      </div>
+
+      <div class="kart">
+        <h3>Kullanıcı ara</h3>
+        <div class="satir">
+          <input id="pAra" placeholder="kullanıcı adı yaz…" oninput="kullaniciAra()">
+        </div>
+        <div class="bulut" id="pSonuc"></div>
+      </div>
+
+      <div class="kart">
+        <h3>En aktif izleyiciler</h3>
+        <table>
+          <thead><tr><th>#</th><th>Kullanıcı</th><th>Mesaj</th><th>İhlal</th><th></th></tr></thead>
+          <tbody id="iAktif"></tbody>
+        </table>
+        <div style="margin-top:14px"><button class="tehlike btn mini" onclick="istatistikSifirla()">İstatistikleri sıfırla</button></div>
       </div>
     </section>
 
@@ -454,6 +579,7 @@
   </main>
 </div>
 
+<div class="profil gizli" id="profilPencere" onclick="if(event.target===this)profilKapat()"><div class="ic" id="profilIc"></div></div>
 <div id="tost"></div>
 
 <script>
@@ -559,6 +685,8 @@ async function yenile() {
     document.getElementById("rzCeza").textContent = d.sayilar.cezali;
     document.getElementById("rzCekilis").textContent = d.cekilis.aktif ? "açık" : "—";
     document.getElementById("rzOyun").textContent = d.oyun ? d.oyun.kalanSaniye + "s" : d.anket ? "anket" : "—";
+    document.getElementById("rzTalep").textContent = d.bekleyenTalep || 0;
+    panikCiz(d.sikiMod);
   } catch (e) {
     if (String(e.message).includes("Şifre")) {
       sessionStorage.removeItem("panelKey");
@@ -567,7 +695,7 @@ async function yenile() {
   }
 
   const aktif = document.querySelector("#menu button.aktif")?.dataset.s;
-  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
+  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, dukkan: dukkanYukle, istatistik: istatistikYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
   if (yukleyici) yukleyici().catch((e) => tost(e.message, true));
 
   // Canli sohbet ve oyun ekrani daha sik yenilenir
@@ -595,7 +723,7 @@ function msjHtml(m) {
   return (
     '<div class="msj' + (m.silindi ? " silinmis" : "") + '" data-id="' + kacir(m.id) + '">' +
     '<span class="zm">' + saat + "</span>" +
-    '<span class="ku" style="color:' + kacir(renk) + '">' + rozetHtml(m.rozetler) + kacir(m.kullanici) + "</span>" +
+    '<span class="ku" style="color:' + kacir(renk) + '" onclick="profilAc(\'' + kacir(m.kullanici) + '\')">' + rozetHtml(m.rozetler) + kacir(m.kullanici) + "</span>" +
     '<span class="ic">' + kacir(m.icerik) + (m.ihlal ? ' <span class="ihl">' + kacir(m.ihlal) + "</span>" : "") + "</span>" +
     '<span class="ar">' +
     (m.silindi ? "" : '<button onclick="msjSil(\'' + kacir(m.id) + '\')">sil</button>') +
@@ -763,6 +891,231 @@ async function oyunAyarKaydet() {
     await iste("/api/ayarlar", { method: "PUT", body: JSON.stringify(AYAR) });
     tost("Oyun ayarları kaydedildi.");
   } catch (e) { tost(e.message, true); }
+}
+
+// ---------- Panik butonu (siki mod) ----------
+async function panikBas() {
+  const d = await iste("/api/sikimod");
+  const yeni = !d.aktif;
+  if (yeni && !confirm("Sıkı mod açılsın mı?\n\n• TÜM linkler yasaklanır (izinli listedekiler dahil)\n• Flood eşiği sertleşir\n• Aynı mesaj tekrarı anında cezalandırılır\n\n10 dakika sonra kendiliğinden kapanır.")) return;
+  await iste("/api/sikimod", { method: "POST", body: JSON.stringify({ aktif: yeni, dakika: yeni ? 10 : 0 }) });
+  tost(yeni ? "Sıkı mod açıldı." : "Sıkı mod kapatıldı.");
+  yenile();
+}
+
+function panikCiz(d) {
+  const kutu = document.getElementById("panikKutu");
+  const b = document.getElementById("panikBaslik");
+  const ip = document.getElementById("panikIp");
+  const btn = document.getElementById("panikBtn");
+  if (!d) return;
+
+  kutu.classList.toggle("acik", d.aktif);
+  if (d.aktif) {
+    b.textContent = "🚨 SIKI MOD AÇIK" + (d.otomatik ? " (otomatik — saldırı tespit edildi)" : "");
+    ip.textContent = "Tüm linkler yasak, spam eşikleri sert." + (d.kalanSaniye ? ` ${Math.ceil(d.kalanSaniye / 60)} dk sonra kapanacak.` : "");
+    btn.textContent = "Sıkı modu kapat";
+    btn.className = "btn";
+  } else {
+    b.textContent = "🛡️ Sıkı mod: kapalı";
+    ip.textContent = "Raid/bot saldırısında aç: tüm linkler yasaklanır, spam eşikleri sertleşir.";
+    btn.textContent = "Sıkı modu aç";
+    btn.className = "btn tehlike";
+  }
+}
+
+// ---------- Dukkan ----------
+async function dukkanYukle() {
+  const v = await iste("/api/dukkan");
+
+  const bekleyen = v.talepler.filter((t) => t.durum === "bekliyor");
+  document.getElementById("talepBos").classList.toggle("gizli", bekleyen.length > 0);
+  document.getElementById("talepTablo").innerHTML = bekleyen
+    .map(
+      (t) =>
+        "<tr>" +
+        '<td class="mono" style="width:120px">' + kacir(t.kullanici) + "</td>" +
+        '<td style="width:150px">' + kacir(t.urunAd) + ' <span style="color:var(--soluk)">(' + t.fiyat + ")</span></td>" +
+        "<td>" + (t.not ? kacir(t.not) : '<span style="color:var(--soluk)">—</span>') + "</td>" +
+        '<td style="width:170px;text-align:right">' +
+        '<button class="btn mini" onclick="talepKarar(\'' + t.id + "','onay')\">Onayla</button> " +
+        '<button class="tehlike btn mini" onclick="talepKarar(\'' + t.id + "','red')\">Reddet</button></td>" +
+        "</tr>"
+    )
+    .join("");
+
+  document.getElementById("urunTablo").innerHTML = (v.ayar.urunler || [])
+    .map(
+      (u, i) =>
+        "<tr>" +
+        '<td class="mono" style="color:var(--yesil)">!al ' + kacir(u.kod) + "</td>" +
+        "<td>" + kacir(u.ad) + "</td>" +
+        '<td class="mono">' + u.fiyat + "</td>" +
+        '<td style="color:var(--soluk)">' + kacir(u.tip) + "</td>" +
+        "<td>" + (u.aktif === false ? '<span style="color:var(--soluk)">kapalı</span>' : "açık") + "</td>" +
+        '<td style="text-align:right"><button class="tehlike btn mini" onclick="urunSil(' + i + ')">Sil</button></td>' +
+        "</tr>"
+    )
+    .join("");
+
+  const gecmis = v.talepler.filter((t) => t.durum !== "bekliyor").slice(0, 30);
+  document.getElementById("talepGecmis").innerHTML = gecmis.length
+    ? gecmis
+        .map(
+          (t) =>
+            '<div class="satirlog"><span class="zaman">' + new Date(t.zaman).toLocaleString("tr-TR") + "</span>" +
+            '<span><span class="kul">' + kacir(t.kullanici) + '</span> <span class="sebep">' + kacir(t.urunAd) + (t.not ? " — " + kacir(t.not) : "") + "</span></span>" +
+            '<span class="islem ' + (t.durum === "onaylandi" ? "i-af" : "i-ban") + '">' + (t.durum === "onaylandi" ? "onay" : "red") + "</span></div>"
+        )
+        .join("")
+    : '<div class="bos">Henüz sonuçlanmış talep yok.</div>';
+}
+
+async function talepKarar(id, karar) {
+  try {
+    const r = await iste("/api/dukkan/talep", { method: "POST", body: JSON.stringify({ id, karar }) });
+    tost(karar === "onay" ? "Onaylandı." : "Reddedildi, " + r.iade + " puan iade edildi.");
+    dukkanYukle();
+    yenile();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function urunEkle() {
+  const kod = document.getElementById("uKod").value.trim().toLowerCase().replace(/\s+/g, "");
+  const ad = document.getElementById("uAd").value.trim();
+  const fiyat = Number(document.getElementById("uFiyat").value);
+  const tip = document.getElementById("uTip").value;
+  const not_zorunlu = document.getElementById("uNot").value === "evet";
+  if (!kod || !ad || !fiyat) return tost("Kod, ad ve fiyat gerekli.", true);
+
+  AYAR = await iste("/api/ayarlar");
+  if (!AYAR.dukkan) AYAR.dukkan = { aktif: true, urunler: [] };
+  AYAR.dukkan.urunler = AYAR.dukkan.urunler.filter((u) => u.kod !== kod);
+  AYAR.dukkan.urunler.push({ kod, ad, fiyat, tip, not_zorunlu, aktif: true, max_adet: 5 });
+  await iste("/api/ayarlar", { method: "PUT", body: JSON.stringify(AYAR) });
+  document.getElementById("uKod").value = "";
+  document.getElementById("uAd").value = "";
+  tost("Ürün eklendi.");
+  dukkanYukle();
+}
+
+async function urunSil(i) {
+  AYAR = await iste("/api/ayarlar");
+  const u = AYAR.dukkan.urunler[i];
+  if (!confirm('"' + u.ad + '" silinsin mi?')) return;
+  AYAR.dukkan.urunler.splice(i, 1);
+  await iste("/api/ayarlar", { method: "PUT", body: JSON.stringify(AYAR) });
+  tost("Ürün silindi.");
+  dukkanYukle();
+}
+
+async function talepTemizle() {
+  if (!confirm("Sonuçlanmış talepler silinsin mi?")) return;
+  await iste("/api/dukkan/talep", { method: "DELETE" });
+  dukkanYukle();
+}
+
+// ---------- Istatistik ----------
+async function istatistikYukle() {
+  const v = await iste("/api/istatistik");
+  document.getElementById("iMesaj").textContent = v.toplamMesaj.toLocaleString("tr-TR");
+  document.getElementById("iIhlal").textContent = v.toplamIhlal.toLocaleString("tr-TR");
+  document.getElementById("iKisi").textContent = v.kisiSayisi.toLocaleString("tr-TR");
+  document.getElementById("iKuyruk").textContent = v.kuyruk ? v.kuyruk.bekleyen + " bekliyor" : "—";
+
+  const enCok = Math.max(1, ...v.filtreler.map((f) => f.sayi));
+  document.getElementById("iFiltre").innerHTML = v.filtreler.length
+    ? v.filtreler
+        .map(
+          (f) =>
+            '<div class="yatay"><div class="ust"><span>' + kacir(f.sebep) + '</span><span class="mono">' + f.sayi + "</span></div>" +
+            '<div class="bar"><div style="width:' + Math.round((f.sayi / enCok) * 100) + '%"></div></div></div>'
+        )
+        .join("")
+    : '<div class="bos">Henüz hiçbir filtre tetiklenmedi.</div>';
+
+  const enYogun = Math.max(1, ...v.saatlik.map((x) => x.sayi));
+  const suan = new Date().getHours();
+  document.getElementById("iSaatlik").innerHTML = v.saatlik
+    .map(
+      (x) =>
+        '<div class="c' + (x.saat === suan ? " dolu" : "") + '" style="height:' + Math.max(2, Math.round((x.sayi / enYogun) * 100)) + '%" data-v="' + x.saat + ":00 — " + x.sayi + ' mesaj"></div>'
+    )
+    .join("");
+
+  document.getElementById("iAktif").innerHTML = v.enAktif
+    .map(
+      (x, i) =>
+        '<tr><td class="mono" style="width:36px;color:var(--soluk)">' + (i + 1) + "</td>" +
+        '<td class="mono">' + kacir(x.kullanici) + "</td>" +
+        '<td class="mono">' + x.mesaj + "</td>" +
+        '<td class="mono" style="color:' + (x.ihlal ? "var(--amber)" : "var(--soluk)") + '">' + x.ihlal + "</td>" +
+        '<td style="text-align:right"><button class="ikincil btn mini" onclick="profilAc(\'' + kacir(x.kullanici) + '\')">Profil</button></td></tr>'
+    )
+    .join("");
+}
+
+async function istatistikSifirla() {
+  if (!confirm("Tüm istatistikler ve kullanıcı geçmişi silinsin mi? Geri alınamaz.")) return;
+  await iste("/api/istatistik", { method: "DELETE" });
+  tost("İstatistikler sıfırlandı.");
+  istatistikYukle();
+}
+
+let araTimer = null;
+function kullaniciAra() {
+  clearTimeout(araTimer);
+  araTimer = setTimeout(async () => {
+    const q = document.getElementById("pAra").value.trim();
+    if (!q) return (document.getElementById("pSonuc").innerHTML = "");
+    const v = await iste("/api/kullanici-ara?q=" + encodeURIComponent(q));
+    document.getElementById("pSonuc").innerHTML = v.length
+      ? v.map((x) => '<span class="cip" style="cursor:pointer" onclick="profilAc(\'' + kacir(x.kullanici) + '\')">' + kacir(x.kullanici) + " (" + x.mesaj + ")</span>").join("")
+      : '<span style="color:var(--soluk);font-size:13px">Bulunamadı.</span>';
+  }, 250);
+}
+
+// ---------- Kullanici profili ----------
+async function profilAc(kullanici) {
+  try {
+    const p = await iste("/api/profil/" + encodeURIComponent(kullanici));
+    const gun = (t) => new Date(t).toLocaleDateString("tr-TR");
+    document.getElementById("profilIc").innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:start">' +
+      "<div><h2>" + kacir(p.kullanici) + '</h2><p class="altbaslik" style="margin:0">İlk görülme: ' + gun(p.ilk) + " · Son: " + gun(p.son) + "</p></div>" +
+      '<button class="ikincil btn mini" onclick="profilKapat()">Kapat</button></div>' +
+      '<div class="kutucuk">' +
+      '<div><div class="e">Mesaj</div><div class="d">' + p.mesaj + "</div></div>" +
+      '<div><div class="e">İhlal</div><div class="d" style="color:' + (p.ihlal ? "var(--amber)" : "var(--metin)") + '">' + p.ihlal + "</div></div>" +
+      '<div><div class="e">Puan</div><div class="d" style="color:var(--yesil)">' + p.puan + "</div></div>" +
+      '<div><div class="e">Ceza puanı</div><div class="d" style="color:' + (p.cezaPuani ? "var(--kirmizi)" : "var(--metin)") + '">' + p.cezaPuani + "</div></div>" +
+      "</div>" +
+      '<p style="color:var(--soluk);font-size:12px">Son mesajı: <span class="mono">' + kacir(p.sonMesaj || "—") + "</span></p>" +
+      '<div style="display:flex;gap:6px;margin:14px 0">' +
+      '<button class="ikincil btn mini" onclick="hizliCeza(\'' + kacir(p.kullanici) + '\',5)">5 dk sustur</button>' +
+      '<button class="ikincil btn mini" onclick="hizliCeza(\'' + kacir(p.kullanici) + '\',60)">1 saat</button>' +
+      '<button class="tehlike btn mini" onclick="hizliCeza(\'' + kacir(p.kullanici) + '\',null)">Banla</button>' +
+      '<button class="btn mini" onclick="af(\'' + kacir(p.kullanici) + '\');profilKapat()">Affet</button>' +
+      "</div>" +
+      "<h3 style=\"font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--soluk);margin:16px 0 8px\">Ceza geçmişi</h3>" +
+      '<div class="log">' +
+      (p.gecmis.length
+        ? p.gecmis
+            .map(
+              (g) =>
+                '<div class="satirlog"><span class="zaman">' + new Date(g.zaman).toLocaleString("tr-TR") + "</span>" +
+                '<span class="sebep">' + kacir(g.sebep) + "</span>" +
+                '<span class="islem i-' + kacir(g.islem) + '">' + kacir(g.islem) + (g.sure ? " " + g.sure + "dk" : "") + "</span></div>"
+            )
+            .join("")
+        : '<div class="bos">Temiz sicil.</div>') +
+      "</div>";
+    document.getElementById("profilPencere").classList.remove("gizli");
+  } catch (e) { tost(e.message, true); }
+}
+
+function profilKapat() {
+  document.getElementById("profilPencere").classList.add("gizli");
 }
 
 // ---------- Kanal ----------

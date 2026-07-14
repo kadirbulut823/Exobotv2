@@ -680,8 +680,13 @@ async function oyunYukle() {
   }
 
   // Ayarlar
-  if (!AYAR) AYAR = await iste("/api/ayarlar");
+  AYAR = await iste("/api/ayarlar");
   const o = AYAR.oyunlar;
+  if (!o || !AYAR.anket) {
+    document.getElementById("oyunAyar").innerHTML =
+      '<div class="uyari">Oyun ayarları bulunamadı. Botun yeni sürümü yüklenmemiş olabilir — Railway loglarını kontrol et.</div>';
+    return;
+  }
   document.getElementById("oyunAyar").innerHTML =
     '<div class="anahtar"><div><div class="ad">Oyunlar açık</div></div>' +
     '<label class="kaydir"><input type="checkbox" data-oy="oyunlar.aktif"' + (o.aktif ? " checked" : "") + "><span></span></label></div>" +

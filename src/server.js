@@ -60,7 +60,16 @@ app.post("/webhook", express.raw({ type: "*/*" }), async (req, res) => {
 
 // ---------------- Panel ----------------
 
-app.use(panelRouter({ kanalHazirla, yayinDurumu: () => yayinAcik }));
+app.use(
+  panelRouter({
+    kanalHazirla,
+    yayinDurumu: () => yayinAcik,
+    // Panelden kanal adi degistirilirse onbellegi sifirla, yeniden cozulsun
+    kanalSifirla: () => {
+      kanal = null;
+    },
+  })
+);
 
 // ---------------- OAuth ----------------
 

@@ -12,6 +12,7 @@ import * as chatlog from "./chatlog.js";
 import * as stats from "./stats.js";
 import * as queue from "./queue.js";
 import * as reactions from "./reactions.js";
+import * as links from "./links.js";
 import { panelRouter } from "./panel.js";
 
 store.yukle();
@@ -83,6 +84,12 @@ app.use(
     kanalHazirla,
     duyur,
     kuyrukDurumu: () => queue.durum(),
+    // Mod panelden bir linki "goruldu" isaretleyince sohbete duyuru at
+    linkDuyur: async (kayit) => {
+      const config = ayar.get();
+      const sablon = config.link_kuyrugu?.goruldu_mesaji || "👁️ Bu linki gördük, teşekkürler {kullanici}!";
+      await duyur(sablon.replace("{kullanici}", "@" + kayit.kullanici), 1);
+    },
     yayinDurumu: () => yayinAcik,
     // Panelden kanal adi degistirilirse onbellegi sifirla, yeniden cozulsun
     kanalSifirla: () => {
@@ -184,6 +191,19 @@ async function sohbetMesaji(olay) {
 
       await mod.cezalandir({ ihlal, sender, messageId, broadcasterUserId, config, duyur });
       return; // ihlalli mesaj oyuna sayilmaz
+    }
+  }
+
+  // 2.5) Link kuyrugu — sohbetteki tum linkleri topla (mod incelemesi icin)
+  const lk = config.link_kuyrugu;
+  if (lk?.aktif) {
+    const sonuc = links.mesajiIsle(sender, messageId, icerik);
+    if (sonuc) {
+      // Ayni link tekrar atildiysa "zaten gorulduk" de
+      if (sonuc.tekrar.length && lk.tekrar_uyarisi) {
+        const mesaj = (lk.tekrar_mesaji || "Bu link zaten paylaşıldı {kullanici}.").replace("{kullanici}", "@" + sender.username);
+        await duyur(mesaj, 0).catch(() => {});
+      }
     }
   }
 

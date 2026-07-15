@@ -11,6 +11,7 @@ import * as games from "./games.js";
 import * as chatlog from "./chatlog.js";
 import * as stats from "./stats.js";
 import * as queue from "./queue.js";
+import * as reactions from "./reactions.js";
 import { panelRouter } from "./panel.js";
 
 store.yukle();
@@ -197,7 +198,14 @@ async function sohbetMesaji(olay) {
   // 4) Anket oyu mu?
   if (games.anketOy(icerik, sender)) return;
 
-  // 5) Sohbet puani
+  // 5) Otomatik tepki (sa -> as gibi)
+  const tepki = reactions.tepkiKontrol(icerik, config);
+  if (tepki) {
+    await duyur(tepki, 0).catch((e) => console.error("[tepki]", e.message));
+    // tepki verilse de sohbet puani yine islensin, return yok
+  }
+
+  // 6) Sohbet puani
   cmd.puanEkle(sender.username, config);
 }
 

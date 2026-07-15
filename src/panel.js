@@ -12,6 +12,7 @@ import * as games from "./games.js";
 import * as chatlog from "./chatlog.js";
 import * as shop from "./shop.js";
 import * as stats from "./stats.js";
+import * as links from "./links.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -63,6 +64,7 @@ export function panelRouter(ctx) {
       anket: games.anketDurumu(),
       sikiMod: mod.sikiModDurumu(),
       bekleyenTalep: shop.talepListesi("bekliyor").length,
+      bekleyenLink: links.liste("bekliyor").length,
       sayilar: {
         islem: db.ban_gecmisi.length,
         cezali: Object.keys(db.cezalar || {}).length,
@@ -298,6 +300,38 @@ export function panelRouter(ctx) {
     delete c.komutlar[req.params.ad];
     ayar.kaydet(c);
     res.json({ ok: true, komutlar: c.komutlar });
+  });
+
+  // ---------------- Link kuyrugu ----------------
+  r.get("/api/linkler", kilit, (_req, res) => {
+    res.json({
+      bekleyen: links.liste("bekliyor"),
+      goruldu: links.liste("goruldu").slice(0, 50),
+    });
+  });
+
+  r.post("/api/linkler/goruldu", kilit, async (req, res) => {
+    const id = String(req.body?.id || "");
+    const kayit = links.gorulduIsaretle(id, "panel");
+    if (!kayit) return res.status(404).json({ hata: "Link bulunamadı." });
+    // Sohbete "gorduk @kullanici" yaz
+    try {
+      await ctx.linkDuyur?.(kayit);
+    } catch (e) {
+      return res.json({ ok: true, uyari: "İşaretlendi ama sohbete yazılamadı: " + e.message });
+    }
+    res.json({ ok: true });
+  });
+
+  r.post("/api/linkler/gerial", kilit, (req, res) => {
+    links.geriAl(String(req.body?.id || ""));
+    res.json({ ok: true });
+  });
+
+  r.delete("/api/linkler", kilit, (req, res) => {
+    if (req.query.id) links.sil(String(req.query.id));
+    else links.gorulenleriTemizle();
+    res.json({ ok: true });
   });
 
   // ---------------- Otomatik tepkiler ----------------

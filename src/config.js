@@ -76,6 +76,17 @@ const GOMULU = {
   },
   anket: { aktif: true, sure_saniye: 60 },
 
+  // Otomatik tepkiler: prefix (!) gerekmez. Biri "sa" yazinca bot "as" yazar.
+  otomatik_tepkiler: {
+    aktif: true,
+    bekleme_saniye: 30, // ayni tepki en fazla bu kadar sik verilir (spam olmasin)
+    kurallar: [
+      { tetik: "sa", cevap: "as", tam_kelime: true },
+      { tetik: "selam", cevap: "Aleyküm selam! 👋", tam_kelime: true },
+    ],
+    _not: "tam_kelime true ise sadece tam eslesmede tepki verir (sa -> evet, salak -> hayir). false ise mesajin icinde gecmesi yeter."
+  },
+
   // Komut spam korumasi
   komut_bekleme: {
     komut_saniye: 10,      // ayni komut en fazla 10 sn'de bir cevaplanir

@@ -195,6 +195,7 @@
       <button class="aktif" data-s="durum">Durum</button>
       <button data-s="sohbet">Canlı sohbet</button>
       <button data-s="oyunlar">Oyunlar <span class="rozet" id="rzOyun">—</span></button>
+      <button data-s="linkler">Linkler <span class="rozet" id="rzLink">0</span></button>
       <button data-s="dukkan">Dükkân <span class="rozet" id="rzTalep">0</span></button>
       <button data-s="istatistik">İstatistik</button>
       <button data-s="cekilis">Çekiliş <span class="rozet" id="rzCekilis">—</span></button>
@@ -313,6 +314,28 @@
         <h3>Oyun ayarları</h3>
         <div id="oyunAyar"></div>
         <button class="btn" style="margin-top:12px" onclick="oyunAyarKaydet()">Kaydet</button>
+      </div>
+    </section>
+
+    <!-- ============ LINKLER ============ -->
+    <section data-bolum="linkler" class="gizli">
+      <h2>Link kuyruğu</h2>
+      <p class="altbaslik">Sohbette paylaşılan tüm linkler burada toplanır. "Gördüm" dediğinde bot sohbete teşekkür yazar.</p>
+
+      <div class="kart">
+        <h3>Bekleyen linkler</h3>
+        <table>
+          <thead><tr><th>Kullanıcı</th><th>Link</th><th>Zaman</th><th></th></tr></thead>
+          <tbody id="linkTablo"></tbody>
+        </table>
+        <div class="bos gizli" id="linkBos">Bekleyen link yok.</div>
+      </div>
+
+      <div class="kart">
+        <h3>Görülen linkler</h3>
+        <table><tbody id="linkGoruldu"></tbody></table>
+        <div class="bos gizli" id="linkGorulduBos">Henüz görülen link yok.</div>
+        <div style="margin-top:12px"><button class="tehlike btn mini" onclick="linkTemizle()">Görülenleri temizle</button></div>
       </div>
     </section>
 
@@ -710,6 +733,7 @@ async function yenile() {
     document.getElementById("rzCekilis").textContent = d.cekilis.aktif ? "açık" : "—";
     document.getElementById("rzOyun").textContent = d.oyun ? d.oyun.kalanSaniye + "s" : d.anket ? "anket" : "—";
     document.getElementById("rzTalep").textContent = d.bekleyenTalep || 0;
+    document.getElementById("rzLink").textContent = d.bekleyenLink || 0;
     panikCiz(d.sikiMod);
   } catch (e) {
     if (String(e.message).includes("Şifre")) {
@@ -719,7 +743,7 @@ async function yenile() {
   }
 
   const aktif = document.querySelector("#menu button.aktif")?.dataset.s;
-  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, dukkan: dukkanYukle, istatistik: istatistikYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
+  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, linkler: linkYukle, dukkan: dukkanYukle, istatistik: istatistikYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
   if (yukleyici) yukleyici().catch((e) => tost(e.message, true));
 
   // Canli sohbet ve oyun ekrani daha sik yenilenir
@@ -946,6 +970,71 @@ function panikCiz(d) {
     btn.textContent = "Sıkı modu aç";
     btn.className = "btn tehlike";
   }
+}
+
+// ---------- Linkler ----------
+async function linkYukle() {
+  const v = await iste("/api/linkler");
+
+  document.getElementById("linkBos").classList.toggle("gizli", v.bekleyen.length > 0);
+  document.getElementById("linkTablo").innerHTML = v.bekleyen
+    .map((x) => {
+      const url = x.link.startsWith("http") ? x.link : "https://" + x.link;
+      const tekrar = x.tekrarSayisi > 1 ? ' <span style="color:var(--amber);font-size:11px">×' + x.tekrarSayisi + "</span>" : "";
+      return (
+        "<tr>" +
+        '<td class="mono" style="width:130px;cursor:pointer" onclick="profilAc(\'' + kacir(x.kullanici) + '\')">' + kacir(x.kullanici) + tekrar + "</td>" +
+        '<td><a href="' + kacir(url) + '" target="_blank" rel="noopener" style="color:var(--mavi);word-break:break-all">' + kacir(x.link) + "</a></td>" +
+        '<td class="mono" style="width:110px;color:var(--soluk);font-size:11px">' + new Date(x.zaman).toLocaleTimeString("tr-TR") + "</td>" +
+        '<td style="width:170px;text-align:right">' +
+        '<button class="btn mini" onclick="linkGoruldu(\'' + x.id + '\')">Gördüm</button> ' +
+        '<button class="tehlike btn mini" onclick="linkSil(\'' + x.id + '\')">Sil</button></td>' +
+        "</tr>"
+      );
+    })
+    .join("");
+
+  document.getElementById("linkGorulduBos").classList.toggle("gizli", v.goruldu.length > 0);
+  document.getElementById("linkGoruldu").innerHTML = v.goruldu
+    .map((x) => {
+      const url = x.link.startsWith("http") ? x.link : "https://" + x.link;
+      return (
+        "<tr>" +
+        '<td class="mono" style="width:130px">' + kacir(x.kullanici) + "</td>" +
+        '<td><a href="' + kacir(url) + '" target="_blank" rel="noopener" style="color:var(--soluk);word-break:break-all">' + kacir(x.link) + "</a></td>" +
+        '<td style="width:90px;color:var(--yesil);font-size:11px">✓ görüldü</td>' +
+        '<td style="width:80px;text-align:right"><button class="ikincil btn mini" onclick="linkGeriAl(\'' + x.id + '\')">Geri al</button></td>' +
+        "</tr>"
+      );
+    })
+    .join("");
+}
+
+async function linkGoruldu(id) {
+  try {
+    const r = await iste("/api/linkler/goruldu", { method: "POST", body: JSON.stringify({ id }) });
+    tost(r.uyari || "Görüldü olarak işaretlendi, sohbete yazıldı.", Boolean(r.uyari));
+    linkYukle();
+    yenile();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function linkGeriAl(id) {
+  await iste("/api/linkler/gerial", { method: "POST", body: JSON.stringify({ id }) });
+  linkYukle();
+  yenile();
+}
+
+async function linkSil(id) {
+  await iste("/api/linkler?id=" + encodeURIComponent(id), { method: "DELETE" });
+  linkYukle();
+  yenile();
+}
+
+async function linkTemizle() {
+  if (!confirm("Görülen tüm linkler silinsin mi?")) return;
+  await iste("/api/linkler", { method: "DELETE" });
+  linkYukle();
 }
 
 // ---------- Dukkan ----------

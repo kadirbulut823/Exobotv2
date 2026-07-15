@@ -76,6 +76,14 @@ const GOMULU = {
   },
   anket: { aktif: true, sure_saniye: 60 },
 
+  // Link kuyrugu: sohbetteki tum linkler moderator gozden gecirsin diye toplanir
+  link_kuyrugu: {
+    aktif: true,
+    tekrar_uyarisi: true, // ayni link tekrar atilinca "zaten gorulduk" mesaji
+    goruldu_mesaji: "👁️ Bu linki gördük, teşekkürler {kullanici}!",
+    tekrar_mesaji: "Bu link zaten paylaşıldı {kullanici}, moderatörler görecek.",
+  },
+
   // Otomatik tepkiler: prefix (!) gerekmez. Biri "sa" yazinca bot "as" yazar.
   otomatik_tepkiler: {
     aktif: true,

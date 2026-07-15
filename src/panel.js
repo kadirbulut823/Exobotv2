@@ -300,6 +300,45 @@ export function panelRouter(ctx) {
     res.json({ ok: true, komutlar: c.komutlar });
   });
 
+  // ---------------- Otomatik tepkiler ----------------
+  r.get("/api/tepkiler", kilit, (_req, res) => res.json(ayar.get().otomatik_tepkiler || { aktif: false, kurallar: [] }));
+
+  r.post("/api/tepkiler", kilit, (req, res) => {
+    const tetik = String(req.body?.tetik || "").trim();
+    const cevap = String(req.body?.cevap || "").trim();
+    const tam = req.body?.tam_kelime !== false;
+    if (!tetik || !cevap) return res.status(400).json({ hata: "Tetik ve cevap gerekli." });
+    if (cevap.length > 480) return res.status(400).json({ hata: "Cevap çok uzun (en fazla 480)." });
+
+    const c = ayar.get();
+    if (!c.otomatik_tepkiler) c.otomatik_tepkiler = { aktif: true, bekleme_saniye: 30, kurallar: [] };
+    // Ayni tetik varsa guncelle
+    c.otomatik_tepkiler.kurallar = c.otomatik_tepkiler.kurallar.filter(
+      (k) => k.tetik.toLocaleLowerCase("tr-TR") !== tetik.toLocaleLowerCase("tr-TR")
+    );
+    c.otomatik_tepkiler.kurallar.push({ tetik, cevap, tam_kelime: tam });
+    ayar.kaydet(c);
+    res.json({ ok: true, kurallar: c.otomatik_tepkiler.kurallar });
+  });
+
+  r.delete("/api/tepkiler", kilit, (req, res) => {
+    const tetik = String(req.query.tetik || "");
+    const c = ayar.get();
+    if (c.otomatik_tepkiler) {
+      c.otomatik_tepkiler.kurallar = c.otomatik_tepkiler.kurallar.filter((k) => k.tetik !== tetik);
+      ayar.kaydet(c);
+    }
+    res.json({ ok: true });
+  });
+
+  r.post("/api/tepkiler/durum", kilit, (req, res) => {
+    const c = ayar.get();
+    if (!c.otomatik_tepkiler) c.otomatik_tepkiler = { aktif: true, bekleme_saniye: 30, kurallar: [] };
+    c.otomatik_tepkiler.aktif = Boolean(req.body?.aktif);
+    ayar.kaydet(c);
+    res.json({ ok: true, aktif: c.otomatik_tepkiler.aktif });
+  });
+
   // ---------------- Yasakli kelimeler ----------------
   r.get("/api/yasakli", kilit, (_req, res) => {
     const c = ayar.get();

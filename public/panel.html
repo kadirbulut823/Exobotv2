@@ -453,6 +453,30 @@
         <table><tbody id="komutTablo"></tbody></table>
         <div class="bos gizli" id="komutBos">Henüz komut yok.</div>
       </div>
+
+      <div class="kart">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0">Otomatik tepkiler <span style="text-transform:none;letter-spacing:0">— <code>!</code> gerekmez</span></h3>
+          <label class="kaydir"><input type="checkbox" id="tepkiAcik" onchange="tepkiDurum()"><span></span></label>
+        </div>
+        <p style="color:var(--soluk);font-size:12px;margin-top:-6px;margin-bottom:12px">
+          Biri "sa" yazınca bot "as" yazar. Tetik ve cevap sen belirlersin.
+        </p>
+        <div class="satir">
+          <div class="alan"><label>Biri bunu yazınca…</label><input id="tTetik" placeholder="sa"></div>
+          <div class="alan"><label>Bot bunu yazsın</label><input id="tCevap" placeholder="as"></div>
+          <div class="alan">
+            <label>Eşleşme</label>
+            <select id="tTam">
+              <option value="evet">Tam kelime (sa ✓, salak ✗)</option>
+              <option value="hayir">İçinde geçsin (her yerde)</option>
+            </select>
+          </div>
+          <div class="alan" style="display:flex;align-items:flex-end"><button class="btn" onclick="tepkiEkle()" style="width:100%">Ekle</button></div>
+        </div>
+        <table><tbody id="tepkiTablo"></tbody></table>
+        <div class="bos gizli" id="tepkiBos">Henüz otomatik tepki yok.</div>
+      </div>
     </section>
 
     <!-- ============ KELIMELER ============ -->
@@ -1198,6 +1222,7 @@ async function cekilisIslem(islem) {
 
 // ---------- Komutlar ----------
 async function komutYukle() {
+  await tepkiYukle();
   const k = await iste("/api/komutlar");
   const girdiler = Object.entries(k);
   document.getElementById("komutBos").classList.toggle("gizli", girdiler.length > 0);
@@ -1211,6 +1236,50 @@ async function komutYukle() {
         '<button class="tehlike btn mini" onclick="komutSil(\'' + kacir(ad) + '\')">Sil</button></td></tr>'
     )
     .join("");
+}
+
+async function tepkiYukle() {
+  const t = await iste("/api/tepkiler");
+  document.getElementById("tepkiAcik").checked = t.aktif !== false;
+  const k = t.kurallar || [];
+  document.getElementById("tepkiBos").classList.toggle("gizli", k.length > 0);
+  document.getElementById("tepkiTablo").innerHTML = k
+    .map(
+      (x) =>
+        "<tr>" +
+        '<td class="mono" style="width:140px;color:var(--mavi)">' + kacir(x.tetik) + "</td>" +
+        '<td style="width:30px;color:var(--soluk)">→</td>' +
+        "<td>" + kacir(x.cevap) + "</td>" +
+        '<td style="width:110px;color:var(--soluk);font-size:11px">' + (x.tam_kelime ? "tam kelime" : "içinde") + "</td>" +
+        '<td style="width:60px;text-align:right"><button class="tehlike btn mini" onclick="tepkiSil(\'' + kacir(x.tetik).replace(/\x27/g, "\\x27") + '\')">Sil</button></td></tr>'
+    )
+    .join("");
+}
+
+async function tepkiEkle() {
+  const tetik = document.getElementById("tTetik").value.trim();
+  const cevap = document.getElementById("tCevap").value.trim();
+  const tam = document.getElementById("tTam").value === "evet";
+  if (!tetik || !cevap) return tost("Tetik ve cevap gerekli.", true);
+  try {
+    await iste("/api/tepkiler", { method: "POST", body: JSON.stringify({ tetik, cevap, tam_kelime: tam }) });
+    document.getElementById("tTetik").value = "";
+    document.getElementById("tCevap").value = "";
+    tost("Tepki eklendi.");
+    tepkiYukle();
+  } catch (e) { tost(e.message, true); }
+}
+
+async function tepkiSil(tetik) {
+  await iste("/api/tepkiler?tetik=" + encodeURIComponent(tetik), { method: "DELETE" });
+  tost("Tepki silindi.");
+  tepkiYukle();
+}
+
+async function tepkiDurum() {
+  const aktif = document.getElementById("tepkiAcik").checked;
+  await iste("/api/tepkiler/durum", { method: "POST", body: JSON.stringify({ aktif }) });
+  tost(aktif ? "Otomatik tepkiler açık." : "Otomatik tepkiler kapalı.");
 }
 
 async function komutKaydet() {

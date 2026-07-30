@@ -247,16 +247,51 @@ export async function abonelikleriSil(idler) {
   return api("DELETE", `/public/v1/events/subscriptions?${q}`);
 }
 
-// Kanal degistirilirken: eski abonelikleri sil, yeni kanala abone ol
+// Kanal degistirilirken: eski abonelikleri sil, yeni kanala abone ol.
+// Kurulumdan sonra GERI OKUYUP dogru kanala kurulup kurulmadigini DOGRULAR.
 export async function abonelikleriYenile(broadcasterUserId) {
+  const hedef = Number(broadcasterUserId);
+  console.log(`[kick] Abonelik yenileniyor. Hedef kanal: ${hedef}`);
+
+  // 1) Eskileri sil
   try {
     const mevcut = await abonelikleriListele();
-    const idler = (mevcut?.data || []).map((s) => s.id).filter(Boolean);
-    if (idler.length) await abonelikleriSil(idler);
+    const liste = mevcut?.data || [];
+    console.log(`[kick] Mevcut ${liste.length} abonelik:`, liste.map((s) => `${s.event || s.name}@${s.broadcaster_user_id}`).join(", ") || "yok");
+    const idler = liste.map((s) => s.id).filter(Boolean);
+    if (idler.length) {
+      await abonelikleriSil(idler);
+      console.log(`[kick] ${idler.length} eski abonelik silindi.`);
+    }
   } catch (e) {
     console.warn("[kick] Eski abonelikler silinemedi:", e.message);
   }
-  return olaylaraAbone(broadcasterUserId);
+
+  // 2) Yeni abonelik kur
+  const sonuc = await olaylaraAbone(hedef);
+  const kurulan = sonuc?.data || [];
+  console.log("[kick] Kurulum yaniti:", JSON.stringify(kurulan).slice(0, 400));
+
+  // 3) DOGRULA: geri oku, chat aboneligi gercekten hedef kanala mi kuruldu?
+  await new Promise((r) => setTimeout(r, 1000)); // Kick'in islemesi icin kisa bekleme
+  const kontrol = await abonelikleriListele();
+  const yeniListe = kontrol?.data || [];
+  const chatAbo = yeniListe.find((s) => (s.event || s.name) === "chat.message.sent");
+
+  if (!chatAbo) {
+    throw new Error("Kurulum sonrasi dogrulama: chat.message.sent aboneligi hic gorunmuyor!");
+  }
+  const kuruluKanal = Number(chatAbo.broadcaster_user_id);
+  if (kuruluKanal && kuruluKanal !== hedef) {
+    throw new Error(
+      `Kick, aboneligi istedigimiz kanala DEGIL kendi hesabina kurdu! ` +
+      `Istenen: ${hedef}, kurulan: ${kuruluKanal}. ` +
+      `Bu genellikle bot hesabinin o kanalda moderator olarak taninmamasindan olur.`
+    );
+  }
+
+  console.log(`[kick] Dogrulandi: chat aboneligi ${kuruluKanal || hedef} kanalina kuruldu.`);
+  return sonuc;
 }
 
 // ---------- Webhook imza dogrulama ----------

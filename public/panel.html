@@ -242,9 +242,18 @@
           Bot hesabının bu kanalda <b>moderatör</b> olması gerekiyor. Bağlandığında sohbet aboneliği otomatik yenilenir.
         </p>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="ikincil btn mini" onclick="wsYenile()">🔌 Sohbet bağlantısını yenile</button>
           <button class="ikincil btn mini" onclick="abonelikYenile()">🔄 Aboneliği yenile</button>
           <button class="ikincil btn mini" onclick="yayinKontrol()">📡 Yayın durumunu kontrol et</button>
         </div>
+        <div class="satir" style="margin-top:12px">
+          <input id="chatroomId" type="number" placeholder="Chatroom ID (gerekirse elle)">
+          <button class="ikincil btn mini" onclick="chatroomKaydet()">Kaydet</button>
+        </div>
+        <p style="color:var(--soluk);font-size:11.5px;margin-top:6px">
+          Sohbet bağlantısı "Chatroom ID yok" derse: tarayıcıda <code>kick.com/api/v2/channels/KANALADI</code> aç,
+          <code>"chatroom":{"id":XXXXX</code> içindeki sayıyı buraya yaz.
+        </p>
         <p style="color:var(--soluk);font-size:11.5px;margin-top:8px">
           Bot sohbeti görmüyorsa "Aboneliği yenile"ye bas. Yayın açık ama "kapalı" görünüyorsa "Yayın durumunu kontrol et"e bas.
         </p>
@@ -1278,6 +1287,22 @@ async function testMesaj() {
   } catch (e) {
     tost("Yazılamadı: " + e.message, true);
   }
+}
+
+async function wsYenile() {
+  await iste("/api/bakim/ws-yenile", { method: "POST" });
+  tost("Sohbet bağlantısı yeniden kuruluyor…");
+  setTimeout(taniCalistir, 3000);
+}
+
+async function chatroomKaydet() {
+  const id = document.getElementById("chatroomId").value;
+  if (!id) return tost("Chatroom ID gir.", true);
+  try {
+    await iste("/api/bakim/chatroom", { method: "POST", body: JSON.stringify({ id }) });
+    tost("Chatroom ID kaydedildi, bağlanılıyor…");
+    setTimeout(taniCalistir, 3000);
+  } catch (e) { tost(e.message, true); }
 }
 
 async function abonelikYenile() {

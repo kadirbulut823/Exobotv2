@@ -344,6 +344,18 @@ export function panelRouter(ctx) {
       ekle("Sohbet aboneliği", false, "Abonelik listesi alınamadı: " + e.message);
     }
 
+    // 4.4 WebSocket sohbet baglantisi (ASIL sohbet kaynagi artik bu)
+    const wsD = ctx.wsDurum?.();
+    if (wsD) {
+      ekle(
+        "Sohbet bağlantısı (WS)",
+        wsD.bagli,
+        wsD.bagli
+          ? `✅ Bağlı (chatroom ${wsD.chatroomId})${wsD.sonMesaj ? " — son mesaj " + Math.round((Date.now() - wsD.sonMesaj) / 1000) + " sn önce" : " — henüz mesaj gelmedi"}`
+          : `❌ ${wsD.durum}${wsD.chatroomId ? "" : " — Chatroom ID yok! Aşağıdan elle gir."}`
+      );
+    }
+
     // 4.5 Son webhook ne zaman geldi? (teslimat kontrolu)
     const sonW = ctx.sonWebhookZamani?.();
     if (sonW) {
@@ -352,8 +364,8 @@ export function panelRouter(ctx) {
     } else {
       ekle(
         "Son webhook",
-        false,
-        "❌ Bot açıldığından beri Kick'ten HİÇ olay gelmedi. Abonelik görünse bile teslimat çalışmıyor. Kick Developer sayfasında (kick.com/settings/developer) Webhook URL'in şu olduğundan emin ol: https://SENIN-RAILWAY-ADRESIN/webhook"
+        true, // artik kritik degil - sohbet WS'ten geliyor
+        "Webhook'tan olay gelmedi (normal — sohbet artık WebSocket'ten okunuyor; webhook sadece takipçi/abone olayları için)."
       );
     }
 
@@ -377,6 +389,19 @@ export function panelRouter(ctx) {
     } catch (e) {
       res.status(500).json({ hata: e.message });
     }
+  });
+
+  // ---------------- Chatroom ID (elle) ----------------
+  r.post("/api/bakim/chatroom", kilit, (req, res) => {
+    const id = Number(req.body?.id);
+    if (!id || id < 1) return res.status(400).json({ hata: "Geçersiz chatroom ID." });
+    ctx.chatroomIdKaydet?.(id);
+    res.json({ ok: true, id });
+  });
+
+  r.post("/api/bakim/ws-yenile", kilit, (_req, res) => {
+    ctx.wsYenidenBaslat?.();
+    res.json({ ok: true });
   });
 
   // ---------------- Bakim: abonelik / yayin ----------------

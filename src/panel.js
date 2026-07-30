@@ -276,6 +276,25 @@ export function panelRouter(ctx) {
 
   r.post("/api/ayarlar/sifirla", kilit, (_req, res) => res.json(ayar.sifirla()));
 
+  // ---------------- Bakim: abonelik / yayin ----------------
+  r.post("/api/bakim/abonelik-yenile", kilit, async (_req, res) => {
+    try {
+      await ctx.abonelikYenile();
+      res.json({ ok: true, mesaj: "Sohbet aboneliği yeniden kuruldu." });
+    } catch (e) {
+      res.status(500).json({ hata: e.message });
+    }
+  });
+
+  r.post("/api/bakim/yayin-kontrol", kilit, async (_req, res) => {
+    try {
+      const canli = await ctx.yayinKontrol();
+      res.json({ ok: true, canli });
+    } catch (e) {
+      res.status(500).json({ hata: e.message });
+    }
+  });
+
   // ---------------- Komutlar ----------------
   const komutlariTemizle = (k) =>
     Object.fromEntries(Object.entries(k || {}).filter(([ad]) => !ad.startsWith("_")));

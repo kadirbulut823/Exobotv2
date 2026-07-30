@@ -84,6 +84,16 @@ app.use(
     kanalHazirla,
     duyur,
     kuyrukDurumu: () => queue.durum(),
+    // Panelden manuel tetiklenebilir bakim islemleri
+    abonelikYenile: async () => {
+      const k = await kanalHazirla();
+      await kick.abonelikleriYenile(k.broadcaster_user_id);
+      return true;
+    },
+    yayinKontrol: async () => {
+      await yayinDurumuGuncelle();
+      return yayinAcik;
+    },
     // Mod panelden bir linki "goruldu" isaretleyince sohbete duyuru at
     linkDuyur: async (kayit) => {
       const config = ayar.get();
@@ -321,6 +331,56 @@ setInterval(async () => {
 }, 30000);
 
 // ---------------- Baslat ----------------
+
+// Yayin durumunu DOGRUDAN Kick'e sorarak guncelle (webhook'a guvenme).
+// Boylece "yayin acik ama bot kapali saniyor" sorunu olmaz.
+async function yayinDurumuGuncelle() {
+  if (!kick.girisYapildiMi()) return;
+  try {
+    const slug = ayar.get().kanal.slug;
+    if (!slug || slug === "kanal-adi-buraya") return;
+    const d = await kick.yayinDurumuGetir(slug);
+    if (d.canli !== yayinAcik) {
+      yayinAcik = d.canli;
+      console.log(`[bot] Yayin durumu (Kick'ten): ${yayinAcik ? "ACIK" : "KAPALI"}${d.canli ? ` — ${d.izleyici} izleyici` : ""}`);
+    }
+  } catch (e) {
+    console.error("[bot] Yayin durumu alinamadi:", e.message);
+  }
+}
+
+// Webhook aboneligi sagligini kontrol et; dusmusse otomatik yeniden kur.
+// Railway duraklamalarindan sonra abonelik dusebiliyor - bu onu tamir eder.
+async function abonelikKontrol() {
+  if (!kick.girisYapildiMi()) return;
+  try {
+    const slug = ayar.get().kanal.slug;
+    if (!slug || slug === "kanal-adi-buraya") return;
+    const k = await kanalHazirla();
+
+    const mevcut = await kick.abonelikleriListele();
+    const abonelikler = mevcut?.data || [];
+    const chatVar = abonelikler.some(
+      (a) => a.event === "chat.message.sent" || a.name === "chat.message.sent"
+    );
+
+    if (!chatVar) {
+      console.warn("[bot] Chat aboneligi bulunamadi! Yeniden kuruluyor...");
+      await kick.abonelikleriYenile(k.broadcaster_user_id);
+      console.log("[bot] Abonelik yeniden kuruldu.");
+    }
+  } catch (e) {
+    console.error("[bot] Abonelik kontrolu basarisiz:", e.message);
+  }
+}
+
+// Acilistan 5 sn sonra ilk kontrol, sonra her 60 sn'de bir
+setTimeout(() => {
+  yayinDurumuGuncelle();
+  abonelikKontrol();
+}, 5000);
+setInterval(yayinDurumuGuncelle, 60000);
+setInterval(abonelikKontrol, 120000);
 
 app.listen(PORT, () => {
   console.log(`[bot] Sunucu calisiyor: port ${PORT}`);

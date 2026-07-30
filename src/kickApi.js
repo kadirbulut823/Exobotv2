@@ -216,7 +216,25 @@ export async function olaylaraAbone(broadcasterUserId) {
       { name: "livestream.status.updated", version: 1 },
     ],
   };
-  return api("POST", "/public/v1/events/subscriptions", { body });
+  const sonuc = await api("POST", "/public/v1/events/subscriptions", { body });
+
+  // ONEMLI: Kick her olay icin AYRI basari/hata doner. Istek 200 olsa bile
+  // icindeki tek tek olaylar basarisiz olabilir. Bunu kontrol etmezsek
+  // "abonelik kuruldu" saniriz ama chat.message.sent aslinda kurulmamis olur.
+  const olaylar = sonuc?.data || [];
+  const hatalar = olaylar
+    .filter((o) => o.error)
+    .map((o) => `${o.name}: ${o.error}`);
+
+  if (hatalar.length) {
+    console.error("[kick] Bazi abonelikler kurulamadi:", hatalar.join(" | "));
+    const chatHata = olaylar.find((o) => o.name === "chat.message.sent" && o.error);
+    if (chatHata) {
+      // Chat aboneligi kurulamadiysa bu KRITIK - hatayi yukari tasi
+      throw new Error(`chat.message.sent aboneligi kurulamadi: ${chatHata.error}`);
+    }
+  }
+  return sonuc;
 }
 
 export async function abonelikleriListele() {

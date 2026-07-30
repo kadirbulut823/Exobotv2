@@ -13,6 +13,7 @@ import * as stats from "./stats.js";
 import * as queue from "./queue.js";
 import * as reactions from "./reactions.js";
 import * as links from "./links.js";
+import * as kickws from "./kickws.js";
 import { panelRouter } from "./panel.js";
 
 store.yukle();
@@ -88,6 +89,15 @@ app.use(
     duyur,
     kuyrukDurumu: () => queue.durum(),
     sonWebhookZamani: () => sonWebhookZamani,
+    wsDurum: () => kickws.durum(),
+    wsSonMesaj: () => kickws.sonMesajZamaniGetir(),
+    wsYenidenBaslat,
+    chatroomIdKaydet: (id) => {
+      const c = ayar.get();
+      c.kanal.chatroom_id = Number(id);
+      ayar.kaydet(c);
+      wsYenidenBaslat();
+    },
     // Panelden manuel tetiklenebilir bakim islemleri
     abonelikYenile: async () => {
       const k = await kanalHazirla();
@@ -108,6 +118,10 @@ app.use(
     // Panelden kanal adi degistirilirse onbellegi sifirla, yeniden cozulsun
     kanalSifirla: () => {
       kanal = null;
+      const c = ayar.get();
+      c.kanal.chatroom_id = null; // yeni kanal -> chatroom yeniden cozulecek
+      ayar.kaydet(c);
+      wsYenidenBaslat();
     },
   })
 );
@@ -392,6 +406,41 @@ async function abonelikKontrol() {
     }
   }
 }
+
+// ---------------- WebSocket sohbet dinleyici ----------------
+// Resmi webhook, bot hesabinin baska kanali dinlemesine izin vermiyor.
+// Bu yuzden sohbet WebSocket'ten okunur; moderasyon resmi API'den devam eder.
+
+async function wsBaslat() {
+  const c = ayar.get();
+  const slug = c.kanal.slug;
+  if (!slug || slug === "kanal-adi-buraya") return;
+
+  // Chatroom ID: once ayarda kayitli mi bak, yoksa cozmeyi dene
+  let chatroomId = c.kanal.chatroom_id || null;
+  if (!chatroomId) {
+    console.log("[ws] Chatroom ID cozuluyor:", slug);
+    chatroomId = await kickws.chatroomIdCoz(slug);
+    if (chatroomId) {
+      c.kanal.chatroom_id = chatroomId;
+      ayar.kaydet(c);
+      console.log("[ws] Chatroom ID bulundu ve kaydedildi:", chatroomId);
+    } else {
+      console.warn("[ws] Chatroom ID cozulemedi (Cloudflare engellemis olabilir). Panelden elle girilebilir: tarayicida kick.com/api/v2/channels/" + slug + " ac, \"chatroom\":{\"id\": degerini bul.");
+      return;
+    }
+  }
+
+  kickws.baglan(chatroomId, sohbetMesaji);
+}
+
+// Kanal degistiginde ws'yi yeniden baslat
+function wsYenidenBaslat() {
+  kickws.kapat();
+  setTimeout(wsBaslat, 1000);
+}
+
+setTimeout(wsBaslat, 3000);
 
 // Acilistan 5 sn sonra ilk kontrol, sonra her 60 sn'de bir
 setTimeout(() => {

@@ -276,6 +276,96 @@ export function panelRouter(ctx) {
 
   r.post("/api/ayarlar/sifirla", kilit, (_req, res) => res.json(ayar.sifirla()));
 
+  // ---------------- TANI (sorun tespiti) ----------------
+  r.get("/api/tani", kilit, async (_req, res) => {
+    const rapor = { adimlar: [], sonuc: "" };
+    const ekle = (ad, ok, detay) => rapor.adimlar.push({ ad, ok, detay });
+
+    // 1. Giris
+    const giris = kick.girisYapildiMi();
+    ekle("Kick girişi", giris, giris ? "Token mevcut" : "GİRİŞ YOK — /auth'tan giriş yapılmalı");
+    if (!giris) {
+      rapor.sonuc = "Bot Kick'e giriş yapmamış. Ana sayfadan /auth'a git.";
+      return res.json(rapor);
+    }
+
+    // 2. Bot kim?
+    try {
+      const ben = await kick.benKimim();
+      ekle("Bot hesabı", Boolean(ben), ben ? `${ben.name} (id: ${ben.user_id})` : "Kullanıcı bilgisi alınamadı");
+    } catch (e) {
+      ekle("Bot hesabı", false, e.message);
+    }
+
+    // 3. Kanal
+    const slug = ayar.get().kanal.slug;
+    let kanalId = null;
+    if (!slug || slug === "kanal-adi-buraya") {
+      ekle("Kanal ayarı", false, "Kanal adı ayarlanmamış! Durum sekmesinden kanal bağla.");
+      rapor.sonuc = "Kanal adı ayarlı değil.";
+      return res.json(rapor);
+    }
+    try {
+      const bilgi = await kick.kanalBilgisi(slug);
+      kanalId = bilgi?.broadcaster_user_id;
+      ekle("Kanal bulundu", Boolean(bilgi), bilgi ? `${bilgi.slug} (id: ${kanalId})` : `"${slug}" bulunamadı`);
+      ekle("Yayın durumu", true, bilgi?.stream?.is_live ? `🔴 AÇIK (${bilgi.stream.viewer_count} izleyici)` : "⚫ Kapalı");
+    } catch (e) {
+      ekle("Kanal bulundu", false, e.message);
+    }
+
+    // 4. Abonelikler — EN KRITIK
+    try {
+      const abo = await kick.abonelikleriListele();
+      const liste = abo?.data || [];
+      const olaylar = liste.map((a) => a.event || a.name).filter(Boolean);
+      const chatVar = olaylar.some((e) => e === "chat.message.sent");
+
+      ekle(
+        "Sohbet aboneliği",
+        chatVar,
+        chatVar
+          ? `✅ Aktif. Tüm abonelikler: ${olaylar.join(", ")}`
+          : liste.length
+          ? `❌ chat.message.sent YOK! Mevcut: ${olaylar.join(", ") || "boş"}`
+          : "❌ HİÇ ABONELİK YOK — bot sohbeti hiç görmüyor. 'Aboneliği yenile'ye bas."
+      );
+
+      // Abonelik hangi kanala? (yanlis kanala abone olma ihtimali)
+      const yanlisKanal = liste.find((a) => a.broadcaster_user_id && kanalId && a.broadcaster_user_id !== kanalId);
+      if (yanlisKanal) {
+        ekle("Abonelik kanalı", false, `⚠️ Abonelik farklı kanala ait (${yanlisKanal.broadcaster_user_id}), bağlı kanal ${kanalId}. 'Aboneliği yenile'ye bas.`);
+      }
+
+      // Webhook method mu?
+      const yontemler = [...new Set(liste.map((a) => a.method).filter(Boolean))];
+      if (yontemler.length) ekle("Abonelik yöntemi", yontemler.includes("webhook"), `Yöntem: ${yontemler.join(", ")}`);
+    } catch (e) {
+      ekle("Sohbet aboneliği", false, "Abonelik listesi alınamadı: " + e.message);
+    }
+
+    // 5. Sohbete yazabiliyor mu? (gercek test mesaji GONDERMEZ, sadece yetki kontrolu icin ayar)
+    ekle("Mesaj tipi", true, `Ayar: "${ayar.get().bot.mesaj_tipi}" ${ayar.get().bot.mesaj_tipi === "bot" ? "(⚠️ 'user' önerilir)" : "(✓)"}`);
+    ekle("Sohbete yazma", ayar.get().bot.sohbete_yazsin, ayar.get().bot.sohbete_yazsin ? "Açık" : "❌ KAPALI — bot hiç yazmaz!");
+
+    const basarisiz = rapor.adimlar.filter((a) => !a.ok);
+    rapor.sonuc = basarisiz.length
+      ? `${basarisiz.length} sorun bulundu. İlk çözülecek: ${basarisiz[0].ad}`
+      : "✅ Her şey normal görünüyor. Sorun sürüyorsa bot hesabı kanalda moderatör olmayabilir.";
+    res.json(rapor);
+  });
+
+  // Gercek test mesaji gonderir
+  r.post("/api/tani/test-mesaj", kilit, async (_req, res) => {
+    try {
+      const k = await ctx.kanalHazirla();
+      await kick.mesajGonder(k.broadcaster_user_id, "🤖 Bot test mesajı — bu görünüyorsa yazma çalışıyor.", ayar.get().bot.mesaj_tipi);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ hata: e.message });
+    }
+  });
+
   // ---------------- Bakim: abonelik / yayin ----------------
   r.post("/api/bakim/abonelik-yenile", kilit, async (_req, res) => {
     try {

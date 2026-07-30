@@ -344,6 +344,19 @@ export function panelRouter(ctx) {
       ekle("Sohbet aboneliği", false, "Abonelik listesi alınamadı: " + e.message);
     }
 
+    // 4.5 Son webhook ne zaman geldi? (teslimat kontrolu)
+    const sonW = ctx.sonWebhookZamani?.();
+    if (sonW) {
+      const dk = Math.round((Date.now() - sonW) / 60000);
+      ekle("Son webhook", dk < 30, dk < 1 ? "Az önce geldi ✓" : `${dk} dk önce geldi${dk >= 30 ? " — uzun süredir hiç olay gelmiyor!" : ""}`);
+    } else {
+      ekle(
+        "Son webhook",
+        false,
+        "❌ Bot açıldığından beri Kick'ten HİÇ olay gelmedi. Abonelik görünse bile teslimat çalışmıyor. Kick Developer sayfasında (kick.com/settings/developer) Webhook URL'in şu olduğundan emin ol: https://SENIN-RAILWAY-ADRESIN/webhook"
+      );
+    }
+
     // 5. Sohbete yazabiliyor mu? (gercek test mesaji GONDERMEZ, sadece yetki kontrolu icin ayar)
     ekle("Mesaj tipi", true, `Ayar: "${ayar.get().bot.mesaj_tipi}" ${ayar.get().bot.mesaj_tipi === "bot" ? "(⚠️ 'user' önerilir)" : "(✓)"}`);
     ekle("Sohbete yazma", ayar.get().bot.sohbete_yazsin, ayar.get().bot.sohbete_yazsin ? "Açık" : "❌ KAPALI — bot hiç yazmaz!");

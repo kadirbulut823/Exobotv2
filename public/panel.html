@@ -231,6 +231,13 @@
         <p style="color:var(--soluk);font-size:12px;margin-top:10px">
           Bot hesabının bu kanalda <b>moderatör</b> olması gerekiyor. Bağlandığında sohbet aboneliği otomatik yenilenir.
         </p>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="ikincil btn mini" onclick="abonelikYenile()">🔄 Aboneliği yenile</button>
+          <button class="ikincil btn mini" onclick="yayinKontrol()">📡 Yayın durumunu kontrol et</button>
+        </div>
+        <p style="color:var(--soluk);font-size:11.5px;margin-top:8px">
+          Bot sohbeti görmüyorsa "Aboneliği yenile"ye bas. Yayın açık ama "kapalı" görünüyorsa "Yayın durumunu kontrol et"e bas.
+        </p>
         <div id="kanalUyari" class="uyari gizli" style="margin-top:12px"></div>
       </div>
 
@@ -1232,6 +1239,35 @@ function profilKapat() {
 }
 
 // ---------- Kanal ----------
+async function abonelikYenile() {
+  const u = document.getElementById("kanalUyari");
+  u.classList.remove("gizli");
+  u.textContent = "Abonelik yenileniyor…";
+  try {
+    const r = await iste("/api/bakim/abonelik-yenile", { method: "POST" });
+    u.textContent = "✅ " + (r.mesaj || "Abonelik yenilendi.") + " Sohbete bir şey yazıp test et.";
+    tost("Abonelik yenilendi.");
+  } catch (e) {
+    u.textContent = "❌ " + e.message;
+    tost(e.message, true);
+  }
+}
+
+async function yayinKontrol() {
+  const u = document.getElementById("kanalUyari");
+  u.classList.remove("gizli");
+  u.textContent = "Yayın durumu kontrol ediliyor…";
+  try {
+    const r = await iste("/api/bakim/yayin-kontrol", { method: "POST" });
+    u.textContent = r.canli ? "🔴 Yayın AÇIK olarak algılandı." : "⚫ Yayın kapalı görünüyor.";
+    tost(r.canli ? "Yayın açık." : "Yayın kapalı.");
+    yenile();
+  } catch (e) {
+    u.textContent = "❌ " + e.message;
+    tost(e.message, true);
+  }
+}
+
 async function kanalBagla() {
   const slug = document.getElementById("kanalSlug").value.trim();
   if (!slug) return tost("Kanal adı gerekli.", true);

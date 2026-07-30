@@ -36,7 +36,10 @@ async function kanalHazirla() {
 
 // ---------------- Webhook (HAM govde gerekiyor -> en once tanimlanmali) ----------------
 
+let sonWebhookZamani = null;
+
 app.post("/webhook", express.raw({ type: "*/*" }), async (req, res) => {
+  sonWebhookZamani = Date.now(); // imza gecersiz olsa bile "Kick bize ulasiyor" demektir
   if (!kick.imzaDogrula(req.headers, req.body)) {
     console.warn("[webhook] Gecersiz imza, reddedildi.");
     return res.status(403).send("invalid signature");
@@ -84,6 +87,7 @@ app.use(
     kanalHazirla,
     duyur,
     kuyrukDurumu: () => queue.durum(),
+    sonWebhookZamani: () => sonWebhookZamani,
     // Panelden manuel tetiklenebilir bakim islemleri
     abonelikYenile: async () => {
       const k = await kanalHazirla();
@@ -351,8 +355,14 @@ async function yayinDurumuGuncelle() {
 
 // Webhook aboneligi sagligini kontrol et; dusmusse otomatik yeniden kur.
 // Railway duraklamalarindan sonra abonelik dusebiliyor - bu onu tamir eder.
+let abonelikHataSayisi = 0;
+
 async function abonelikKontrol() {
   if (!kick.girisYapildiMi()) return;
+
+  // Ust uste 3 kez basarisiz olduysa 30 dk ara ver (sil-kur dongusune girme)
+  if (abonelikHataSayisi >= 3) return;
+
   try {
     const slug = ayar.get().kanal.slug;
     if (!slug || slug === "kanal-adi-buraya") return;
@@ -360,17 +370,26 @@ async function abonelikKontrol() {
 
     const mevcut = await kick.abonelikleriListele();
     const abonelikler = mevcut?.data || [];
+    // Hem event hem name alanina bak, hem de kanala ait olmasina dikkat et
     const chatVar = abonelikler.some(
-      (a) => a.event === "chat.message.sent" || a.name === "chat.message.sent"
+      (a) =>
+        (a.event === "chat.message.sent" || a.name === "chat.message.sent") &&
+        (!a.broadcaster_user_id || a.broadcaster_user_id === k.broadcaster_user_id)
     );
 
     if (!chatVar) {
-      console.warn("[bot] Chat aboneligi bulunamadi! Yeniden kuruluyor...");
+      console.warn("[bot] Bu kanal icin chat aboneligi yok! Yeniden kuruluyor...");
       await kick.abonelikleriYenile(k.broadcaster_user_id);
       console.log("[bot] Abonelik yeniden kuruldu.");
     }
+    abonelikHataSayisi = 0; // basarili kontrol -> sayaci sifirla
   } catch (e) {
-    console.error("[bot] Abonelik kontrolu basarisiz:", e.message);
+    abonelikHataSayisi++;
+    console.error(`[bot] Abonelik kontrolu basarisiz (${abonelikHataSayisi}/3):`, e.message);
+    if (abonelikHataSayisi >= 3) {
+      console.error("[bot] Abonelik 3 kez kurulamadi. 30 dk sonra tekrar denenecek. Muhtemel sebepler: Kick Developer sayfasinda Webhook URL eksik/yanlis, ya da Kick tarafinda gecici sorun.");
+      setTimeout(() => (abonelikHataSayisi = 0), 30 * 60000);
+    }
   }
 }
 

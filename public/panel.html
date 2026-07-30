@@ -214,6 +214,16 @@
       <h2>Durum</h2>
       <p class="altbaslik">Botun şu anki hâli ve hızlı işlemler.</p>
 
+      <div class="kart" style="border-color:var(--yesil)">
+        <h3>🔍 Sorun tespiti</h3>
+        <p style="color:var(--soluk);font-size:12.5px;margin-bottom:12px">Bot çalışmıyorsa buna bas — nerede takıldığını tek tek gösterir.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" onclick="taniCalistir()">Tam kontrol yap</button>
+          <button class="ikincil btn" onclick="testMesaj()">Sohbete test mesajı gönder</button>
+        </div>
+        <div id="taniSonuc" style="margin-top:14px"></div>
+      </div>
+
       <div class="panik" id="panikKutu">
         <div>
           <b id="panikBaslik">🛡️ Sıkı mod: kapalı</b>
@@ -1239,6 +1249,37 @@ function profilKapat() {
 }
 
 // ---------- Kanal ----------
+async function taniCalistir() {
+  const el = document.getElementById("taniSonuc");
+  el.innerHTML = '<span style="color:var(--soluk)">Kontrol ediliyor…</span>';
+  try {
+    const r = await iste("/api/tani");
+    el.innerHTML =
+      r.adimlar
+        .map(
+          (a) =>
+            '<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--cizgi);align-items:baseline">' +
+            '<span style="flex:0 0 20px">' + (a.ok ? "✅" : "❌") + "</span>" +
+            '<span style="flex:0 0 150px;font-weight:500">' + kacir(a.ad) + "</span>" +
+            '<span style="flex:1;color:var(--soluk);font-size:12.5px">' + kacir(a.detay) + "</span></div>"
+        )
+        .join("") +
+      '<div style="margin-top:12px;padding:10px 12px;background:#0f1a08;border:1px solid var(--yesil);border-radius:3px;font-size:13px">' +
+      kacir(r.sonuc) + "</div>";
+  } catch (e) {
+    el.innerHTML = '<span style="color:var(--kirmizi)">' + kacir(e.message) + "</span>";
+  }
+}
+
+async function testMesaj() {
+  try {
+    await iste("/api/tani/test-mesaj", { method: "POST" });
+    tost("Test mesajı gönderildi. Sohbete bak — göründü mü?");
+  } catch (e) {
+    tost("Yazılamadı: " + e.message, true);
+  }
+}
+
 async function abonelikYenile() {
   const u = document.getElementById("kanalUyari");
   u.classList.remove("gizli");

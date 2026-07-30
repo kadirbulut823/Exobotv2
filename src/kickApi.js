@@ -141,7 +141,19 @@ async function api(method, yol, { body, query } = {}, tekrar = true) {
 
 export async function kanalBilgisi(slug) {
   const j = await api("GET", "/public/v1/channels", { query: { slug } });
-  return j?.data?.[0] || null; // { broadcaster_user_id, slug, ... }
+  return j?.data?.[0] || null; // { broadcaster_user_id, slug, stream:{is_live,...}, ... }
+}
+
+// Kanalin SU ANKI yayin durumunu dogrudan Kick'e sorar.
+// Webhook'a bagimli degil - bot her zaman gercek durumu bilir.
+export async function yayinDurumuGetir(slug) {
+  const bilgi = await kanalBilgisi(slug);
+  return {
+    canli: Boolean(bilgi?.stream?.is_live),
+    izleyici: bilgi?.stream?.viewer_count || 0,
+    baslik: bilgi?.stream_title || "",
+    kategori: bilgi?.category?.name || "",
+  };
 }
 
 export async function benKimim() {

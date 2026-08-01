@@ -55,6 +55,9 @@ function esikler(config) {
 
 // ---------- Raid / bot saldirisi tespiti ----------
 // Kisa surede cok sayida FARKLI kullanicidan AYNI mesaj gelirse saldiri sayilir.
+// DIKKAT: "vit", "gg", emote gibi kisa/populer mesajlar normal yayinda da coklu
+// gelir. Yanlis alarm vermemek icin: kisa mesajlar sayilmaz, esik yuksek tutulur,
+// ve raid ceza olarak BAN degil susturma verir (yanlis alarm geri alinabilsin).
 const sonMesajlar = []; // { kul, metin, zaman }
 
 function raidKontrol(kul, metin, config) {
@@ -63,19 +66,22 @@ function raidKontrol(kul, metin, config) {
 
   const simdi = Date.now();
   const pencere = (r.saniye ?? 15) * 1000;
+  const minUzunluk = r.min_mesaj_uzunlugu ?? 10; // kisa mesajlar (vit, gg, emote) raid sayilmaz
 
-  sonMesajlar.push({ kul, metin, zaman: simdi });
+  // Sadece yeterince UZUN mesajlar raid adayidir
+  if (metin && metin.length >= minUzunluk) {
+    sonMesajlar.push({ kul, metin, zaman: simdi });
+  }
   while (sonMesajlar.length && simdi - sonMesajlar[0].zaman > pencere) sonMesajlar.shift();
 
   // Ayni metni yazan farkli kullanici sayisi
   const sayim = {};
   for (const m of sonMesajlar) {
-    if (!m.metin || m.metin.length < 3) continue;
     if (!sayim[m.metin]) sayim[m.metin] = new Set();
     sayim[m.metin].add(m.kul);
   }
 
-  const esik = r.farkli_kullanici ?? 5;
+  const esik = r.farkli_kullanici ?? 8;
   for (const [metinX, kullanicilar] of Object.entries(sayim)) {
     if (kullanicilar.size >= esik) {
       sonMesajlar.length = 0;
@@ -384,7 +390,13 @@ export async function cezalandir({ ihlal, sender, messageId, broadcasterUserId, 
   const puan = cezaPuaniEkle(kul.toLowerCase(), ihlal.agirlik, config.cezalar.puan_sifirlama_dakika ?? 60);
 
   const adimlar = config.cezalar.adimlar || [];
-  const adim = adimlar[Math.min(puan, adimlar.length) - 1] || adimlar[adimlar.length - 1];
+  let adim = adimlar[Math.min(puan, adimlar.length) - 1] || adimlar[adimlar.length - 1];
+
+  // RAID: ceza puanindan bagimsiz olarak SABIT kisa susturma.
+  // Asil koruma zaten siki mod; kisiye ban atmak yanlis alarmda magdur eder.
+  if (ihlal.raid) {
+    adim = { islem: "timeout", sure: config.raid_korumasi?.susturma_dakika ?? 10 };
+  }
 
   // 1) Mesaji her durumda sil
   try {

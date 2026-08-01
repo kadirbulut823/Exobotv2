@@ -101,12 +101,17 @@ export function rozetleri(sender) {
 
 export function yetkiliMi(sender, broadcaster, config) {
   const kul = (sender.username || "").toLowerCase();
+
+  // Moderatör ve yayıncı HER ZAMAN muaf — bu ayara bağlı değildir, asla ceza almazlar.
+  const rozet = rozetleri(sender);
+  if (rozet.includes("broadcaster") || rozet.includes("moderator")) return true;
+  if (broadcaster?.user_id && sender.user_id === broadcaster.user_id) return true;
+
+  // Muaf listesi
   const muaf = (config.bagisiklik.muaf_kullanicilar || []).map((u) => u.toLowerCase());
   if (muaf.includes(kul)) return true;
 
-  const rozet = rozetleri(sender);
-  if (config.bagisiklik.yayinci && (rozet.includes("broadcaster") || sender.user_id === broadcaster?.user_id)) return true;
-  if (config.bagisiklik.moderatorler && rozet.includes("moderator")) return true;
+  // Opsiyonel muafiyetler (ayara bağlı)
   if (config.bagisiklik.vipler && rozet.includes("vip")) return true;
   if (config.bagisiklik.aboneler && rozet.includes("subscriber")) return true;
   return false;

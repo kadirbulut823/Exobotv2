@@ -205,6 +205,8 @@
       <button data-s="log">Moderasyon kaydı</button>
       <button data-s="filtreler">Filtreler</button>
       <button data-s="puanlar">Puan tablosu</button>
+      <button data-s="profiller">Profiller</button>
+      <button data-s="guncellemeler">Güncellemeler</button>
     </nav>
   </aside>
 
@@ -509,7 +511,7 @@
           <label class="kaydir"><input type="checkbox" id="tepkiAcik" onchange="tepkiDurum()"><span></span></label>
         </div>
         <p style="color:var(--soluk);font-size:12px;margin-top:-6px;margin-bottom:12px">
-          Biri "sa" yazınca bot "as" yazar. Tetik ve cevap sen belirlersin.
+          Biri "sa" yazınca bot "as" yazar. Cevaba <code>{kullanici}</code> yazarsan, yazan kişi etiketlenir — örn: <code>as {kullanici}</code> → "as @ahmet".
         </p>
         <div class="satir">
           <div class="alan"><label>Biri bunu yazınca…</label><input id="tTetik" placeholder="sa"></div>
@@ -649,6 +651,35 @@
         <div style="margin-top:14px"><button class="tehlike btn mini" onclick="puanSifirla()">Tüm puanları sıfırla</button></div>
       </div>
     </section>
+    <!-- ============ PROFILLER ============ -->
+    <section data-bolum="profiller" class="gizli">
+      <h2>Kanal profilleri</h2>
+      <p class="altbaslik">Her kanalın ayarları, komutları ve puanları ayrı saklanır. Kanal değiştirip geri dönünce her şey yerinde olur.</p>
+
+      <div class="kart">
+        <h3>Aktif kanal</h3>
+        <p style="font-size:14px">Şu an bağlı: <b class="mono" id="prAktif">—</b></p>
+        <p style="color:var(--soluk);font-size:12px;margin:8px 0 12px">Profil her 5 dakikada bir otomatik kaydedilir. Hemen kaydetmek istersen:</p>
+        <button class="btn" onclick="profilKaydet()">Şimdi kaydet</button>
+      </div>
+
+      <div class="kart">
+        <h3>Kayıtlı profiller</h3>
+        <table>
+          <thead><tr><th>Kanal</th><th>Son kayıt</th><th>Komut</th><th>Puanlı kişi</th><th></th></tr></thead>
+          <tbody id="prTablo"></tbody>
+        </table>
+        <div class="bos gizli" id="prBos">Henüz kayıtlı profil yok. Bir kanala bağlandığında otomatik oluşur.</div>
+        <p style="color:var(--soluk);font-size:11.5px;margin-top:10px">Bir profile geçmek için Durum sekmesinden o kanala bağlan — profili otomatik yüklenir.</p>
+      </div>
+    </section>
+
+    <!-- ============ GUNCELLEMELER ============ -->
+    <section data-bolum="guncellemeler" class="gizli">
+      <h2>Güncelleme notları</h2>
+      <p class="altbaslik">Bot sürümü: <b class="mono" id="gSurum">—</b></p>
+      <div id="gListe"></div>
+    </section>
   </main>
 </div>
 
@@ -769,7 +800,7 @@ async function yenile() {
   }
 
   const aktif = document.querySelector("#menu button.aktif")?.dataset.s;
-  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, linkler: linkYukle, dukkan: dukkanYukle, istatistik: istatistikYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle }[aktif];
+  const yukleyici = { sohbet: sohbetYukle, oyunlar: oyunYukle, linkler: linkYukle, dukkan: dukkanYukle, istatistik: istatistikYukle, cekilis: cekilisYukle, komutlar: komutYukle, kelimeler: kelimeYukle, cezalar: cezaYukle, log: logYukle, filtreler: filtreYukle, puanlar: puanYukle, profiller: profillerYukle, guncellemeler: guncellemelerYukle }[aktif];
   if (yukleyici) yukleyici().catch((e) => tost(e.message, true));
 
   // Canli sohbet ve oyun ekrani daha sik yenilenir
@@ -1255,6 +1286,55 @@ async function profilAc(kullanici) {
 
 function profilKapat() {
   document.getElementById("profilPencere").classList.add("gizli");
+}
+
+// ---------- Profiller ----------
+async function profillerYukle() {
+  const v = await iste("/api/profiller");
+  document.getElementById("prAktif").textContent = v.aktif || "—";
+  document.getElementById("prBos").classList.toggle("gizli", v.profiller.length > 0);
+  document.getElementById("prTablo").innerHTML = v.profiller
+    .map(
+      (p) =>
+        "<tr>" +
+        '<td class="mono" style="color:' + (p.slug === v.aktif ? "var(--yesil)" : "var(--metin)") + '">' + kacir(p.slug) + (p.slug === v.aktif ? " (aktif)" : "") + "</td>" +
+        '<td class="mono" style="color:var(--soluk);font-size:12px">' + (p.kayitZamani ? new Date(p.kayitZamani).toLocaleString("tr-TR") : "—") + "</td>" +
+        '<td class="mono">' + (p.komutSayisi ?? "—") + "</td>" +
+        '<td class="mono">' + (p.puanliKisi ?? "—") + "</td>" +
+        '<td style="text-align:right">' + (p.slug === v.aktif ? "" : '<button class="tehlike btn mini" onclick="profilSil(\'' + kacir(p.slug) + '\')">Sil</button>') + "</td>" +
+        "</tr>"
+    )
+    .join("");
+}
+
+async function profilKaydet() {
+  const r = await iste("/api/profiller/kaydet", { method: "POST" });
+  tost(r.ok ? '"' + r.slug + '" profili kaydedildi.' : "Kaydedilemedi.", !r.ok);
+  profillerYukle();
+}
+
+async function profilSil(slug) {
+  if (!confirm('"' + slug + '" profili silinsin mi? O kanalın kayıtlı ayarları/puanları kaybolur.')) return;
+  await iste("/api/profiller/" + encodeURIComponent(slug), { method: "DELETE" });
+  tost("Profil silindi.");
+  profillerYukle();
+}
+
+// ---------- Guncellemeler ----------
+async function guncellemelerYukle() {
+  const v = await iste("/api/guncellemeler");
+  document.getElementById("gSurum").textContent = "v" + v.surum;
+  document.getElementById("gListe").innerHTML = v.notlar
+    .map(
+      (n) =>
+        '<div class="kart">' +
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">' +
+        '<b style="font-size:15px">' + kacir(n.baslik) + "</b>" +
+        '<span class="mono" style="color:var(--soluk);font-size:11px">v' + kacir(n.surum) + " · " + kacir(n.tarih) + "</span></div>" +
+        n.maddeler.map((m) => '<div style="display:flex;gap:8px;padding:4px 0;font-size:13.5px"><span style="color:var(--yesil)">＋</span><span>' + kacir(m) + "</span></div>").join("") +
+        "</div>"
+    )
+    .join("");
 }
 
 // ---------- Kanal ----------

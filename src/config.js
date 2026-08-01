@@ -89,8 +89,8 @@ const GOMULU = {
     aktif: true,
     bekleme_saniye: 30, // ayni tepki en fazla bu kadar sik verilir (spam olmasin)
     kurallar: [
-      { tetik: "sa", cevap: "as", tam_kelime: true },
-      { tetik: "selam", cevap: "Aleyküm selam! 👋", tam_kelime: true },
+      { tetik: "sa", cevap: "as {kullanici} 👋", tam_kelime: true },
+      { tetik: "selam", cevap: "Aleyküm selam {kullanici}!", tam_kelime: true },
     ],
     _not: "tam_kelime true ise sadece tam eslesmede tepki verir (sa -> evet, salak -> hayir). false ise mesajin icinde gecmesi yeter."
   },

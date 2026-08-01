@@ -346,6 +346,26 @@ export function cezaPuaniGetir(kul, sifirlamaDk = 60) {
   return kayit.puan;
 }
 
+// 7 gunden eski ceza kayitlarini tamamen siler.
+// (puan_sifirlama_dakika sadece kademeyi sifirlar; kayit panelde durur.
+//  Bu fonksiyon eski kayitlari komple temizler.)
+export function eskiCezalariTemizle(gunSiniri = 7) {
+  const kayitlar = cezaKayitlari();
+  const sinir = Date.now() - gunSiniri * 24 * 60 * 60 * 1000;
+  let silinen = 0;
+  for (const [kul, k] of Object.entries(kayitlar)) {
+    if ((k.sonIhlal || 0) < sinir) {
+      delete kayitlar[kul];
+      silinen++;
+    }
+  }
+  if (silinen) {
+    store.kaydet();
+    console.log(`[mod] ${silinen} eski ceza kaydı temizlendi (${gunSiniri} günden eski).`);
+  }
+  return silinen;
+}
+
 export function cezaPuaniSifirla(kul) {
   const kayitlar = cezaKayitlari();
   const vardi = Boolean(kayitlar[kul.toLowerCase()]);

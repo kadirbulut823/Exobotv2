@@ -13,6 +13,8 @@ import * as chatlog from "./chatlog.js";
 import * as shop from "./shop.js";
 import * as stats from "./stats.js";
 import * as links from "./links.js";
+import * as profiles from "./profiles.js";
+import { SURUM, NOTLAR } from "./changelog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -239,10 +241,25 @@ export function panelRouter(ctx) {
     }
     if (!bilgi) return res.status(404).json({ hata: `"${slug}" adında bir kanal bulunamadı.` });
 
-    // 2) Ayara yaz, onbellegi sifirla
+    // 2) PROFIL: eski kanalin verisini kaydet, yeni kanalinkini (varsa) yukle
+    const eskiSlug = ayar.get().kanal.slug;
+    let profilDurumu = "";
+    if (eskiSlug && eskiSlug !== "kanal-adi-buraya" && eskiSlug !== (bilgi.slug || slug)) {
+      profiles.kaydet(eskiSlug);
+      profilDurumu = `"${eskiSlug}" profili kaydedildi. `;
+    }
+
     const c = ayar.get();
     c.kanal.slug = bilgi.slug || slug;
     ayar.kaydet(c);
+
+    if (profiles.varMi(c.kanal.slug)) {
+      profiles.yukle(c.kanal.slug);
+      profilDurumu += `"${c.kanal.slug}" profili yüklendi — komutlar, puanlar, ayarlar geri geldi.`;
+    } else {
+      profilDurumu += `"${c.kanal.slug}" için kayıtlı profil yok, mevcut ayarlarla devam ediliyor.`;
+    }
+
     ctx.kanalSifirla?.();
 
     // 3) Webhook aboneligini yeni kanala tasi (bu olmadan mesajlar gelmez)
@@ -258,6 +275,7 @@ export function panelRouter(ctx) {
       slug: c.kanal.slug,
       kanalId: bilgi.broadcaster_user_id,
       abonelik,
+      profil: profilDurumu,
     });
   });
 
@@ -389,6 +407,25 @@ export function panelRouter(ctx) {
     } catch (e) {
       res.status(500).json({ hata: e.message });
     }
+  });
+
+  // ---------------- Guncellemeler ----------------
+  r.get("/api/guncellemeler", kilit, (_req, res) => res.json({ surum: SURUM, notlar: NOTLAR }));
+
+  // ---------------- Profiller ----------------
+  r.get("/api/profiller", kilit, (_req, res) => {
+    res.json({ aktif: ayar.get().kanal.slug, profiller: profiles.listele() });
+  });
+
+  r.post("/api/profiller/kaydet", kilit, (_req, res) => {
+    const slug = ayar.get().kanal.slug;
+    const ok = profiles.kaydet(slug);
+    res.json({ ok, slug });
+  });
+
+  r.delete("/api/profiller/:slug", kilit, (req, res) => {
+    profiles.sil(req.params.slug);
+    res.json({ ok: true });
   });
 
   // ---------------- Chatroom ID (elle) ----------------

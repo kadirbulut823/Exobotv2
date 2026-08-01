@@ -14,6 +14,7 @@ import * as queue from "./queue.js";
 import * as reactions from "./reactions.js";
 import * as links from "./links.js";
 import * as kickws from "./kickws.js";
+import * as profiles from "./profiles.js";
 import { panelRouter } from "./panel.js";
 
 store.yukle();
@@ -247,7 +248,7 @@ async function sohbetMesaji(olay) {
   if (games.anketOy(icerik, sender)) return;
 
   // 5) Otomatik tepki (sa -> as gibi)
-  const tepki = reactions.tepkiKontrol(icerik, config);
+  const tepki = reactions.tepkiKontrol(icerik, sender, config);
   if (tepki) {
     await duyur(tepki, 0).catch((e) => console.error("[tepki]", e.message));
     // tepki verilse de sohbet puani yine islensin, return yok
@@ -441,6 +442,16 @@ function wsYenidenBaslat() {
 }
 
 setTimeout(wsBaslat, 3000);
+
+// Aktif kanal profili her 5 dakikada bir otomatik kaydedilir
+setInterval(() => {
+  const slug = ayar.get().kanal.slug;
+  if (slug && slug !== "kanal-adi-buraya") profiles.kaydet(slug);
+}, 5 * 60000);
+
+// Eski ceza kayitlari temizligi: acilista + her 24 saatte bir
+setTimeout(() => mod.eskiCezalariTemizle(7), 10000);
+setInterval(() => mod.eskiCezalariTemizle(7), 24 * 60 * 60 * 1000);
 
 // Acilistan 5 sn sonra ilk kontrol, sonra her 60 sn'de bir
 setTimeout(() => {

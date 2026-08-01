@@ -12,7 +12,8 @@ function sadelestir(s) {
 }
 
 // Mesaji kontrol eder. Tepki gerekiyorsa cevap metnini dondurur, yoksa null.
-export function tepkiKontrol(icerik, config) {
+// Cevap icinde {kullanici} yazarsa, mesaji yazan kisinin adiyla degistirilir.
+export function tepkiKontrol(icerik, sender, config) {
   const t = config.otomatik_tepkiler;
   if (!t?.aktif || !t.kurallar?.length) return null;
 
@@ -42,7 +43,8 @@ export function tepkiKontrol(icerik, config) {
     if (simdi - (sonTepki.get(tetik) || 0) < bekleme) return null;
     sonTepki.set(tetik, simdi);
 
-    return String(kural.cevap).slice(0, 490);
+    const ad = sender?.username ? "@" + sender.username : "";
+    return String(kural.cevap).replace(/\{kullanici\}/g, ad).trim().slice(0, 490);
   }
 
   return null;

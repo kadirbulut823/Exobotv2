@@ -111,9 +111,11 @@ const GOMULU = {
   raid_korumasi: {
     aktif: true,
     saniye: 15,
-    farkli_kullanici: 5,
-    ceza_agirligi: 5,      // dogrudan en agir cezaya gider
-    siki_mod_dakika: 10,   // tespit edilirse siki mod bu kadar sure acik kalir
+    farkli_kullanici: 8,        // 8 farkli hesap ayni UZUN mesaji yazarsa (5 cok dusuktu)
+    min_mesaj_uzunlugu: 10,     // 10 karakterden kisa mesajlar raid sayilmaz (vit, gg, emote gecer)
+    ceza_agirligi: 1,           // ceza puanina az etki (asil koruma siki mod)
+    susturma_dakika: 10,        // raid'de ban degil bu kadar susturma
+    siki_mod_dakika: 10,        // tespit edilirse siki mod bu kadar sure acik kalir
   },
 
   // Puan dukkani

@@ -39,6 +39,21 @@ const DB_ALANLARI = [
   "cekilis",
 ];
 
+// Bir alanin "bos" hali (yeni/profilsiz kanala gecince eski veri kalmasin)
+function bosDeger(alan) {
+  if (alan === "cekilis") return { aktif: false, anahtar: "", katilimcilar: {}, biletler: {}, kazanan: null };
+  if (["ban_gecmisi", "yasakli_ek", "talepler", "linkler"].includes(alan)) return [];
+  if (alan === "istatistik") return null;
+  return {}; // puanlar, cezalar, kullanicilar
+}
+
+// Aktif kanal verisini komple temizler (profili olmayan kanala gecerken)
+export function verileriTemizle() {
+  const db = store.get();
+  for (const alan of DB_ALANLARI) db[alan] = bosDeger(alan);
+  store.kaydet();
+}
+
 export function kaydet(slug) {
   if (!slug || slug === "kanal-adi-buraya") return false;
   try {
@@ -84,11 +99,11 @@ export function yukle(slug) {
       ayar.kaydet(yeniAyar);
     }
 
-    // Veriler
+    // Veriler: profilde olmayan alanlar BOSALTILIR (eski kanaldan sizmasin)
     if (profil.veriler) {
       const db = store.get();
       for (const alan of DB_ALANLARI) {
-        if (profil.veriler[alan] !== undefined) db[alan] = profil.veriler[alan];
+        db[alan] = profil.veriler[alan] !== undefined ? profil.veriler[alan] : bosDeger(alan);
       }
       store.kaydet();
     }

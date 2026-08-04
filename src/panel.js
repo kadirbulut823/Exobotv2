@@ -243,21 +243,31 @@ export function panelRouter(ctx) {
 
     // 2) PROFIL: eski kanalin verisini kaydet, yeni kanalinkini (varsa) yukle
     const eskiSlug = ayar.get().kanal.slug;
+    const yeniSlug = bilgi.slug || slug;
     let profilDurumu = "";
-    if (eskiSlug && eskiSlug !== "kanal-adi-buraya" && eskiSlug !== (bilgi.slug || slug)) {
+    const kanalDegisti = eskiSlug && eskiSlug !== "kanal-adi-buraya" && eskiSlug !== yeniSlug;
+
+    if (kanalDegisti) {
       profiles.kaydet(eskiSlug);
       profilDurumu = `"${eskiSlug}" profili kaydedildi. `;
     }
 
     const c = ayar.get();
-    c.kanal.slug = bilgi.slug || slug;
+    c.kanal.slug = yeniSlug;
     ayar.kaydet(c);
 
-    if (profiles.varMi(c.kanal.slug)) {
-      profiles.yukle(c.kanal.slug);
-      profilDurumu += `"${c.kanal.slug}" profili yüklendi — komutlar, puanlar, ayarlar geri geldi.`;
+    if (profiles.varMi(yeniSlug)) {
+      profiles.yukle(yeniSlug);
+      profilDurumu += `"${yeniSlug}" profili yüklendi — bu kanalın komutları, puanları, moderasyon kaydı geri geldi.`;
     } else {
-      profilDurumu += `"${c.kanal.slug}" için kayıtlı profil yok, mevcut ayarlarla devam ediliyor.`;
+      // Yeni kanalin profili yok: eski kanalin verisi ekranda kalmasin diye TEMIZLE.
+      // (Sadece gercekten kanal degistiyse; ayni kanala yeniden baglaniyorsa dokunma.)
+      if (kanalDegisti) {
+        profiles.verileriTemizle();
+        profilDurumu += `"${yeniSlug}" ilk kez bağlandı — temiz sayfa (moderasyon kaydı, puanlar sıfır).`;
+      } else {
+        profilDurumu += `"${yeniSlug}" bağlı.`;
+      }
     }
 
     ctx.kanalSifirla?.();

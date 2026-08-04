@@ -197,12 +197,19 @@ function kelimeVarMi(metin, kelime) {
   for (const token of tokenlar) {
     if (!token) continue;
     const tSik = sikistir(token);
-    // Tam eslesme: "amk", "aaammmkkk", "a.m.k" -> hepsi "amk"
+
+    // TAM eslesme: kelimenin kendisi olmali.
+    // "yarak" -> "yarak" ceza, ama "oynayarak" icinde geçince CEZA YOK.
+    // "amk", "aaammmkkk", "a.m.k", "y4r4k" gibi kacamaklar yine yakalanir
+    // cunku sadelestir/sikistir bunlari kelimenin kendisine indiriyor.
     if (tSik === kSik) return true;
-    // Uzun kelimeler icin parca eslesmesi: "orospucocugu" icinde "orospu"
-    // (5 harften kisa kelimelerde YAPILMAZ, yoksa "normal" icinde "mal" yakalanir)
-    if (kSik.length >= 5 && tSik.includes(kSik)) return true;
   }
+
+  // Boslukla ayrilmis kacamak: "y a r a k", "a m k" -> tum bosluklari sil, TAM esles.
+  // Bu, birlesik metin kufurun KENDISINE esitse tetiklenir; "oynayarak" gibi
+  // uzun kelimelerde tetiklenmez cunku birlesik hali kufre esit degil, icinde geciyor.
+  const birlesik = sikistir(yapistirilmisMetin(metin).replace(/\s/g, ""));
+  if (kSik.length >= 3 && birlesik === kSik) return true;
 
   return false;
 }

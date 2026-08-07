@@ -25,6 +25,7 @@ const PORT = process.env.PORT || 3000;
 
 let kanal = null; // { broadcaster_user_id, slug }
 let yayinAcik = false;
+let botKimlik = null; // { user_id, username } — botun kendi mesajlarini ayirt etmek icin
 
 async function kanalHazirla() {
   if (kanal) return kanal;
@@ -152,6 +153,7 @@ app.get("/auth/callback", async (req, res) => {
     await kick.kodDegistir(String(code), String(state));
 
     const ben = await kick.benKimim();
+    if (ben?.user_id) botKimlik = { user_id: ben.user_id, username: ben.name };
     const k = await kanalHazirla();
 
     let aboneSonuc = "OK";
@@ -185,6 +187,15 @@ async function sohbetMesaji(olay) {
   const messageId = olay.message_id;
   if (!sender?.username) return;
 
+  // Botun KENDI mesajlarini asla isleme (yoksa kendi yazdigi linke "link paylastin"
+  // der, kendi duyurusuna tepki verir vb). Hem id hem isimle kontrol.
+  if (
+    (botKimlik?.user_id && sender.user_id === botKimlik.user_id) ||
+    (botKimlik?.username && sender.username?.toLowerCase() === botKimlik.username.toLowerCase())
+  ) {
+    return;
+  }
+
   const config = ayar.get();
   const k = await kanalHazirla();
   const broadcasterUserId = broadcaster?.user_id || k.broadcaster_user_id;
@@ -192,7 +203,7 @@ async function sohbetMesaji(olay) {
   cmd.kullaniciKaydet(sender);
 
   // 0) Panelde canli izlenebilmesi icin tampona at + istatistik
-  chatlog.ekle({ messageId, sender, icerik, rozetler: mod.rozetleri(sender) });
+  chatlog.ekle({ messageId, sender, icerik, rozetler: mod.rozetleri(sender), yanit: olay.yanit || null });
   stats.mesajKaydet(sender, icerik);
 
   // 1) Komutlar
@@ -223,9 +234,10 @@ async function sohbetMesaji(olay) {
     }
   }
 
-  // 2.5) Link kuyrugu — sohbetteki tum linkleri topla (mod incelemesi icin)
+  // 2.5) Link kuyrugu — sohbetteki linkleri topla (mod incelemesi icin)
+  // Mod/yayinci/muaf kisilerin linkleri kuyruga girmez, onlara "zaten paylasildi" denmez.
   const lk = config.link_kuyrugu;
-  if (lk?.aktif) {
+  if (lk?.aktif && !mod.yetkiliMi(sender, broadcaster, config)) {
     const sonuc = links.mesajiIsle(sender, messageId, icerik);
     if (sonuc) {
       // Ayni link tekrar atildiysa "zaten gorulduk" de
@@ -440,6 +452,19 @@ function wsYenidenBaslat() {
   kickws.kapat();
   setTimeout(wsBaslat, 1000);
 }
+
+// Bot kendi kimligini ogrensin (kendi mesajlarini yoksaymak icin)
+async function botKimligiYukle() {
+  if (botKimlik || !kick.girisYapildiMi()) return;
+  try {
+    const ben = await kick.benKimim();
+    if (ben?.user_id) {
+      botKimlik = { user_id: ben.user_id, username: ben.name };
+      console.log(`[bot] Kendi kimligi ogrenildi: ${ben.name} (id: ${ben.user_id})`);
+    }
+  } catch {}
+}
+setTimeout(botKimligiYukle, 4000);
 
 setTimeout(wsBaslat, 3000);
 
